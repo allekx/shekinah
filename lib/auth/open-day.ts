@@ -88,5 +88,15 @@ function mapOpenDayError(message: string): string {
   if (message.includes("PRODUTO_NAO_ENCONTRADO")) {
     return "Um dos produtos não foi encontrado.";
   }
+  if (
+    message.includes("business_days_day_key") ||
+    message.includes("duplicate key value violates unique constraint")
+  ) {
+    // Constraint business_days_day_key (UNIQUE day): já existe registro para a
+    // data de hoje (ex.: dia encerrado). A migration 0020 remove essa trava
+    // (permite reabrir no mesmo dia após fechamento); até ela ser aplicada,
+    // a mensagem mostra a causa real em vez de um erro genérico.
+    return "Já existe um registro para a data de hoje. Nesta versão não é possível abrir outro dia na mesma data — aguarde a data virar.";
+  }
   return "Não foi possível abrir o dia. Tente novamente.";
 }

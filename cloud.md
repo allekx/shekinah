@@ -323,7 +323,7 @@ DIA ENCERRADO
    - Causa: helpers eram `SECURITY INVOKER` → recursão com a política de `profiles`.
    - Solução: tornar os helpers `SECURITY DEFINER` com `set search_path=''` e referências qualificadas (quebra a recursão, sem escalar privilégio — consultam apenas o próprio papel).
    - Status: **resolvido** — correção aplicada no banco e nas migrations 0002/0005; RLS revalidado.
-2. **`business_days.day` é UNIQUE**: não é possível abrir mais de um dia de operação para a mesma data (o dia fechado de hoje bloqueia reabrir hoje). É o desenho aprovado (1 dia por data); se necessário reabrir no mesmo dia, exigiria evolução.
+2. **`business_days.day` é UNIQUE**: não é possível abrir mais de um dia de operação para a mesma data (o dia fechado de hoje bloqueia reabrir hoje). Foi tratado como *desenho aprovado*, mas **tornou-se o problema de produção de 12/08/2026** (não era possível iniciar um novo dia após o fechamento). **Correção preparada** na migration `0020` (remover `UNIQUE(day)`; `business_days_one_open_idx` segue garantindo no máximo 1 dia aberto). **Aguardando autorização para aplicar.**
 3. **Papel por prefixo de e-mail**: acoplamento simples; se John quiser papel manual, criar RPC de gestão de usuário.
 4. **Teste de anti-corrida concorrente não executado**: o teste real de duas conexões simultâneas da última unidade não pôde ser rodado. A mecânica (locks `FOR UPDATE`) está implementada e o bloqueio de estoque insuficiente foi validado; o teste concorrente fica como pendência.
 5. **Login falha para usuários criados via SQL direto**: usuários inseridos fora do painel (INSERT em `auth.users`) geram "Database error querying schema" no GoTrue. Causa: faltam identity/metadados no formato exato do GoTrue. Solução: criar usuários **sempre pelo painel/Admin API**. Os usuários de teste criados via SQL foram removidos.
@@ -448,6 +448,30 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **SIGNUP PÚBLICO DESATIVADO (12/08/2026)**: usuário desativou "Allow new users to sign up" no painel Supabase — brecha de segurança da auditoria fechada.
 - **DEPLOY NO VERCEL REALIZADO (12/08/2026)**: usuário fez deploy via repositório GitHub. Sistema publicado em URL `*.vercel.app`. **Importante**: verificar as variáveis de ambiente no Vercel (NEXT_PUBLIC_SUPABASE_URL + ANON_KEY) — são obrigatórias e não vão para o repositório.
 
+### 12/08/2026 (tarde) — PROBLEMA DE PRODUÇÃO: NÃO CONSEGUE INICIAR UM NOVO DIA
+
+**Investigação concluída — causa raiz identificada. Correção PREPARADA localmente, NÃO aplicada ainda.**
+
+- **Problema**: após encerrar o dia e tentar iniciar um novo dia, o sistema exibe "Não foi possível iniciar o dia." mesmo preenchendo caixa inicial (0 ou >0) e estoque inicial.
+- **Cenário que reproduziu** (produção `https://shekinah-five.vercel.app`): login `atendimento@checknap.com` (papel john) → fechamento normal do dia existente → tentativa de abrir novo dia → preenche estoque inicial → caixa inicial vazio/0/valor → sempre falha.
+- **Onde acontece**:
+  - Front: `app/(app)/abrir-dia/open-day-form.tsx` → server action `lib/auth/open-day.ts` (linha 60: `supabase.rpc("open_business_day", …)`; linhas 70-71 fallback `Não foi possível abrir o dia.`; linha 91 fallback genérico no `mapOpenDayError`).
+  - Banco: RPC `public.open_business_day` (`supabase/migrations/0006_rpc_open_close_day.sql`, linhas 108-110) insere `business_days` com `day = (now() at time zone v_tz)::date`.
+- **Causa raiz (dados reais)**:
+  - Constraint **`business_days_day_key` = UNIQUE(day)** (criada em `0003` via `day date not null unique`).
+  - No banco há **uma única linha**: `day=2026-08-11`, **status `fechado`** (fechado em `2026-08-12 00:56 UTC`).
+  - A troca de dia no fuso do estabelecimento (`settings.tz = America/Manaus`, UTC−4) ocorre às **04:00 UTC**. Às `2026-08-12 01:31 UTC` ainda é **`2026-08-11` em Manaus**.
+  - Logo, `open_business_day` abre com `day=2026-08-11`, que **já existe** (fechado). O INSERT viola o UNIQUE e aborta a transação. Como o erro de violação não é mapeado, cai no fallback genérico.
+  - **Estoque/caixa NÃO são o problema**: o erro ocorre no INSERT do dia, antes de qualquer gravação de estoque. Caixa vazio→0 passou da validação do front (`initialCash=0`, não é NaN nem <0) e chega como `p_initial_cash=0` — inofensivo.
+- **Erro real** (que a mensagem esconde):
+  ```
+  ERROR: duplicate key value violates unique constraint "business_days_day_key"
+  DETAIL: Key (day)=(2026-08-11) already exists.
+  ```
+- **Tabelas/RPCs envolvidas**: `business_days` (constraint `business_days_day_key`, índice `business_days_one_open_idx`), RPC `open_business_day(numeric, jsonb)`, `settings.tz`.
+- **Solução preparada (migration local `0020_allow_reopen_same_day.sql`)**: remover `business_days_day_key` (UNIQUE(day)). A regra de "no máximo 1 dia aberto por vez" continua garantida pelo índice parcial único `business_days_one_open_idx` (UNIQUE(1) WHERE status='aberto'). Dia fechado nunca é apagado; reabrir a mesma data cria novo registro com novo id (histórico/pedidos do anterior intactos).
+- **STATUS: AGUARDANDO AUTORIZAÇÃO PARA APLICAR** (migration NÃO rodada no banco; NADA foi alterado em produção).
+
 ## 15. Estado atual
 
 ```
@@ -481,9 +505,10 @@ PROBLEMAS PENDENTES:
 - Modelo/método da impressora INDEFINIDO — transportes reais são stubs até escolher o modelo.
 - Seed de produtos é exemplo; ajustar com o atendimento (John).
 - Usuários devem ser criados SEMPRE pelo painel (via SQL dá erro de login no GoTrue).
-- `business_days.day` único por data: não é possível abrir 2º dia na mesma data.
+- `business_days.day` único por data — **CAUSA RAIZ do problema de produção (12/08/2026)**: após fechar o dia na mesma data do fuso do estabelecimento (America/Manaus), não é possível abrir novo dia (viola `business_days_day_key`). **Correção preparada localmente na migration `0020` (remover UNIQUE(day); `one_open_idx` mantém 1 aberto). PENDENTE de autorização para aplicar.**
 - Todos os dados atuais (pedidos/dia) são de TESTE — na operação real será aberto um novo dia.
 - Dependência `sharp` é devOnly (usada apenas para gerar ícones) — não afeta produção/custo.
+- **`business_days.day` único por data impedindo reabrir — migration 0020 PREPARADA localmente (NAO aplicada)**. Aguardando autorização do usuário para `supabase db push`.
 ```
 
 ---
