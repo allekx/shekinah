@@ -445,6 +445,8 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
   - **Banco (migrations aplicadas)**: `0018` (pedido PRONTO + PAGO → ENTREGUE automático; RLS products: john vê inativos p/ reativar), `0019` (troco em dinheiro — valida pelo líquido `amount - change_given`, aceita excedente como troco).
   - **Impressão**: `DOUBLE_H_ON` corrigido para `GS ! n` (era comando errado `ESC d`).
 - **VALIDAÇÃO DAS CORREÇÕES (banco real) CONCLUÍDA (12/08/2026)**: após autorização do usuário, o dia de teste foi removido e um dia novo aberto. **10/10 testes passaram**: dinheiro com TROCO (entrega R$200 → troco R$80, líquido = total, `paid=true`); **pronto + pago → ENTREGUE automático** + histórico `pronto→entregue`; `cancel_order` (status cancelado, estoque restaurado, cancelar pago bloqueado); RLS products **john vê inativos** (reativar). A revisão técnica está **concluída e validada**.
+- **SIGNUP PÚBLICO DESATIVADO (12/08/2026)**: usuário desativou "Allow new users to sign up" no painel Supabase — brecha de segurança da auditoria fechada.
+- **DEPLOY NO VERCEL REALIZADO (12/08/2026)**: usuário fez deploy via repositório GitHub. Sistema publicado em URL `*.vercel.app`. **Importante**: verificar as variáveis de ambiente no Vercel (NEXT_PUBLIC_SUPABASE_URL + ANON_KEY) — são obrigatórias e não vão para o repositório.
 
 ## 15. Estado atual
 
@@ -463,15 +465,18 @@ Revisão técnica completa validada: correções LOCAIS (build OK) + migrations 
 banco real (10/10 testes).
 
 PRÓXIMA ETAPA:
-1) Ação recomendada (configuração): **desativar signup público** no painel Supabase (Authentication →
-   Sign In → Email: Allow new users to sign up = OFF). Sem isso, o papel por e-mail pode ser explorado.
-2) Quando o modelo da impressora for escolhido: implementar o transporte real (bluetooth/usb/rede).
-3) Operação real: abrir um novo dia; deploy no Vercel.
-4) Teste de anti-corrida concorrente real (pendente).
+1) ✅ **Signup público DESATIVADO** no painel Supabase (usuário confirmou em 12/08/2026) — brecha da auditoria fechada.
+2) ✅ **Deploy no Vercel realizado pelo usuário** (via repositório GitHub) — 12/08/2026. Sistema no ar em URL `*.vercel.app`.
+3) **Verificar variáveis de ambiente no Vercel** (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) — são obrigatórias e não são commitadas (`.env.local` fica fora do repositório). Sem elas o app não conecta ao Supabase.
+4) Quando o modelo da impressora for escolhido: implementar o transporte real (bluetooth/usb/rede).
+5) Operação real: abrir um novo dia.
+6) Teste de anti-corrida concorrente real (pendente).
 
 PROBLEMAS PENDENTES:
-- **Desativar signup público no Supabase** (recomendado pela auditoria; ação de configuração).
-- Há um dia ABERTO (2026-08-11) com 3 pedidos de teste da validação — pode ser limpo ao iniciar operação real.
+- Confirmar que as variáveis de ambiente estão configuradas no Vercel (URL + anon key).
+- Modelo/método da impressora INDEFINIDO — transportes reais são stubs até escolher o modelo.
+- Há um dia ABERTO (2026-08-11) com pedidos de teste da validação — pode ser limpo ao iniciar operação real.
+- Teste de anti-corrida concorrente real (pendente).
 - Teste de anti-corrida concorrente (duas conexões simultâneas) ainda não executado.
 - Modelo/método da impressora INDEFINIDO — transportes reais são stubs até escolher o modelo.
 - Seed de produtos é exemplo; ajustar com o atendimento (John).
