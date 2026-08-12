@@ -43,8 +43,7 @@ export default function PrintPreviewModal({
 
         <div className="border-t border-neutral-200 px-4 py-3">
           <p className="text-center text-[11px] text-neutral-400">
-            A impressão física depende do modelo/método de conexão da impressora
-            (a definir). Esta é a pré-visualização.
+            Visualização da comanda em formato de impressão.
           </p>
         </div>
       </div>

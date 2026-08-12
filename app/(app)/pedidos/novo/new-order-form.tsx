@@ -120,7 +120,6 @@ export default function NewOrderForm({
         <BackButton />
         <div>
           <h1 className="text-xl font-bold text-neutral-900">Novo pedido</h1>
-          <p className="text-sm text-neutral-500">Dia de operação · {dayId.slice(0, 8)}</p>
         </div>
       </header>
 
@@ -340,7 +339,7 @@ export default function NewOrderForm({
             </button>
             <p className="mt-2 text-center text-xs text-neutral-400">
               {canSubmit
-                ? "Pedido é criado de uma só vez (atômico no banco)"
+                ? "Ao finalizar, o pedido é enviado à cozinha."
                 : "Selecione itens para finalizar"}
             </p>
           </div>

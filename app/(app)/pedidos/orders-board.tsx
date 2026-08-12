@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cancelOrderAction } from "@/lib/auth/orders";
+import AddItemsModal from "./add-items-modal";
 import BackButton from "@/components/back-button";
 
 interface OrderItemLite {
@@ -21,6 +22,15 @@ interface Order {
   created_at: string;
   updated_at: string;
   items: OrderItemLite[];
+}
+
+interface Product {
+  id: number;
+  name: string;
+  unit_price: number;
+  category: string | null;
+  tracks_stock: boolean;
+  available: number | null;
 }
 
 interface ColumnDef {
@@ -56,10 +66,23 @@ const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
 /** Quadro de pedidos do dia com atualização em tempo real (Realtime em orders). */
-export default function OrdersBoard({ dayId, orders: initial }: { dayId: string; orders: Order[] }) {
+export default function OrdersBoard({
+  dayId,
+  orders: initial,
+  products,
+}: {
+  dayId: string;
+  orders: Order[];
+  products: Product[];
+}) {
   const [orders, setOrders] = useState<Order[]>(initial);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [addFor, setAddFor] = useState<Order | null>(null);
   const supabase = createClient();
+
+  // Um pedido pode receber itens enquanto não estiver pago/cancelado/entregue
+  // (regra da RPC add_items_to_order: novo/em_preparo/pronto com dia aberto).
+  const canAddItems = (o: Order) => !o.paid && o.status !== "cancelado" && o.status !== "entregue";
 
   // Assina Realtime: INSERT/UPDATE em orders do dia
   useEffect(() => {
@@ -151,10 +174,23 @@ export default function OrdersBoard({ dayId, orders: initial }: { dayId: string;
         <div>
           <h1 className="text-xl font-bold text-neutral-900">Pedidos do dia</h1>
           <p className="text-sm text-neutral-500">
-            Atualização automática · {orders.filter((o) => o.status !== "cancelado").length} pedido(s) ativo(s)
+            {orders.filter((o) => o.status !== "cancelado").length} pedido(s) ativo(s)
           </p>
         </div>
       </header>
+
+      {/* Modal de adicionar itens (complemento) */}
+      {addFor && (
+        <AddItemsModal
+          order={addFor}
+          products={products}
+          onClose={() => setAddFor(null)}
+          onAdded={({ id, total }) => {
+            // atualiza o total local (o Realtime também vai refetchar itens)
+            setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, total } : o)));
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {COLUMNS.map((col) => {
@@ -219,26 +255,39 @@ export default function OrdersBoard({ dayId, orders: initial }: { dayId: string;
                         </span>
                       </div>
 
-                      {/* Cancelar (john, pedido não pago) */}
-                      {!o.paid && o.status !== "cancelado" && o.status !== "entregue" && (
-                        <form
-                          action={async (formData) => {
-                            const res = await cancelOrderAction(formData);
-                            if (res?.error) setActionError(res.error);
-                          }}
-                          className="mt-1"
-                        >
-                          <input type="hidden" name="order_id" value={o.id} />
-                          <button
-                            type="submit"
-                            onClick={(e) => {
-                              if (!confirm("Cancelar este pedido? O estoque será devolvido.")) e.preventDefault();
-                            }}
-                            className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700"
-                          >
-                            Cancelar
-                          </button>
-                        </form>
+                      {/* Ações: Adicionar itens (adicionável) + Cancelar (não pago) */}
+                      {(canAddItems(o) || (!o.paid && o.status !== "cancelado")) && (
+                        <div className="mt-2 flex gap-2">
+                          {canAddItems(o) && (
+                            <button
+                              type="button"
+                              onClick={() => setAddFor(o)}
+                              className="flex-1 rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-bold text-blue-700"
+                            >
+                              ＋ Adicionar itens
+                            </button>
+                          )}
+                          {!o.paid && o.status !== "cancelado" && o.status !== "entregue" && (
+                            <form
+                              action={async (formData) => {
+                                const res = await cancelOrderAction(formData);
+                                if (res?.error) setActionError(res.error);
+                              }}
+                              className="flex-1"
+                            >
+                              <input type="hidden" name="order_id" value={o.id} />
+                              <button
+                                type="submit"
+                                onClick={(e) => {
+                                  if (!confirm("Cancelar este pedido? O estoque será devolvido.")) e.preventDefault();
+                                }}
+                                className="w-full rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700"
+                              >
+                                Cancelar
+                              </button>
+                            </form>
+                          )}
+                        </div>
                       )}
                     </li>
                   ))}

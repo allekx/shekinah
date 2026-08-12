@@ -41,8 +41,8 @@ export default async function PedidosPage() {
     );
   }
 
-  // Pedidos do dia + itens
-  const [ordersRes, itemsRes] = await Promise.all([
+  // Pedidos do dia + itens + produtos ativos (p/ complemento) + estoque
+  const [ordersRes, itemsRes, productsRes, stockRes] = await Promise.all([
     supabase
       .from("orders")
       .select("id, number, customer_name, status, total, paid, created_at, updated_at")
@@ -52,6 +52,16 @@ export default async function PedidosPage() {
       .from("order_items")
       .select("order_id, product_name, quantity, unit_price, subtotal, complement_id")
       .order("created_at", { ascending: true }),
+    supabase
+      .from("products")
+      .select("id, name, unit_price, category, tracks_stock, active")
+      .eq("active", true)
+      .order("category", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("daily_stock")
+      .select("product_id, initial_qty, sold_qty")
+      .eq("business_day_id", day.id),
   ]);
 
   const itemsByOrder: Record<string, { product_name: string; quantity: number; complementary: boolean }[]> = {};
@@ -75,5 +85,19 @@ export default async function PedidosPage() {
     items: itemsByOrder[o.id] ?? [],
   }));
 
-  return <OrdersBoard dayId={day.id} orders={orders} />;
+  // Disponibilidade de cada produto (para o modal de complemento)
+  const stockMap: Record<number, number> = {};
+  for (const s of stockRes.data ?? []) {
+    stockMap[s.product_id] = s.initial_qty - s.sold_qty;
+  }
+  const products = (productsRes.data ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    unit_price: Number(p.unit_price),
+    category: p.category,
+    tracks_stock: p.tracks_stock,
+    available: p.tracks_stock ? stockMap[p.id] ?? 0 : null, // null = sem controle
+  }));
+
+  return <OrdersBoard dayId={day.id} orders={orders} products={products} />;
 }

@@ -27,6 +27,83 @@ export interface CancelOrderResult {
   error?: string;
 }
 
+export interface AddItemsResult {
+  error?: string;
+  /** Pedido atualizado (para atualizar a UI e reimprimir). */
+  orderId?: string;
+  orderNumber?: number;
+  total?: number;
+  /** Itens adicionados (snapshot, para a comanda complementar). */
+  complementItems?: { product_name: string; quantity: number; unit_price: number }[];
+}
+
+/** Adiciona itens a um pedido EXISTENTE (complemento).
+ *  Chama a RPC add_items_to_order (transacional): NÃO cria novo pedido, NÃO
+ *  substitui itens, recalcula o total somando TODOS os itens (originais +
+ *  complemento), baixa estoque, cria order_complements (auditoria quem/quando).
+ *  Respeita regras do banco: dia aberto, não pago, não cancelado, não entregue.
+ */
+export async function addItemsAction(
+  orderId: string,
+  items: { product_id: number; quantity: number; unit_price: number }[]
+): Promise<AddItemsResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+
+  if (!orderId || !items.length) return { error: "Dados inválidos." };
+
+  const { data, error } = await supabase.rpc("add_items_to_order", {
+    p_order_id: orderId,
+    p_items: items,
+  });
+
+  if (error) {
+    return { error: mapAddItemsError(error.message) };
+  }
+
+  // Nomes dos produtos adicionados (para a comanda complementar / Realtime).
+  const namesById: Record<number, string> = {};
+  const { data: catalog } = await supabase
+    .from("products")
+    .select("id, name")
+    .in("id", items.map((it) => it.product_id));
+  for (const p of catalog ?? []) namesById[p.id] = p.name;
+
+  revalidatePath("/", "layout");
+  revalidatePath("/pedidos", "layout");
+  revalidatePath("/cozinha", "layout");
+
+  return {
+    orderId: data?.id as string | undefined,
+    orderNumber: data?.number as number | undefined,
+    total: data?.total != null ? Number(data.total) : undefined,
+    complementItems: items.map((it) => ({
+      product_name: namesById[it.product_id] ?? "?",
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+    })),
+  };
+}
+
+function mapAddItemsError(message: string): string {
+  if (message.includes("PERMISSAO_NEGADA")) return "Você não tem permissão para adicionar itens.";
+  if (message.includes("PEDIDO_JA_PAGO")) return "Este pedido já está pago — não pode receber itens.";
+  if (message.includes("PEDIDO_CANCELADO")) return "Este pedido foi cancelado — não pode receber itens.";
+  if (message.includes("PEDIDO_ENTREGUE")) return "Este pedido já foi entregue — não pode receber itens.";
+  if (message.includes("DIA_NAO_ABERTO")) return "Não há dia aberto para adicionar itens.";
+  if (message.includes("ESTOQUE_INSUFICIENTE")) return "Estoque insuficiente para um dos produtos.";
+  if (message.includes("PRODUTO_INATIVO")) return "Um dos produtos está inativo.";
+  if (message.includes("PRODUTO_SEM_ESTOQUE_INICIAL")) return "Produto sem estoque inicial no dia.";
+  if (message.includes("QUANTIDADE_INVALIDA")) return "Quantidade inválida.";
+  if (message.includes("PRECO_INVALIDO")) return "Preço inválido.";
+  if (message.includes("COMPLEMENTO_SEM_ITENS")) return "Selecione itens para adicionar.";
+  if (message.includes("PEDIDO_NAO_ENCONTRADO")) return "Pedido não encontrado.";
+  return "Não foi possível adicionar os itens. Tente novamente.";
+}
+
 /** Cancela um pedido NÃO PAGO (restaura estoque) via RPC cancel_order.
  *  Somente john; pedido pago não pode ser cancelado (banco bloqueia).
  */

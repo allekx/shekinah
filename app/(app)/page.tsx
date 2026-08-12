@@ -90,7 +90,7 @@ export default async function HomePage() {
         >
           🌅 INICIAR DIA
         </a>
-        <p className="mt-6 text-xs text-neutral-400">Acesso restrito · SHEKINAH</p>
+        <p className="mt-6 text-xs text-neutral-400">Acesso restrito</p>
       </div>
     );
   }
@@ -189,7 +189,7 @@ export default async function HomePage() {
       </section>
 
       <p className="text-center text-xs text-neutral-400">
-        Histórico e relatórios em /historico · SHEKINAH
+        Histórico e relatórios
       </p>
     </div>
   );

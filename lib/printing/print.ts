@@ -14,7 +14,7 @@
  * O transporte real (rede/web-bluetooth/usb) é plugável — ver transports.ts.
  * O default é 'preview' (mostra o modal, sem impressora).
  */
-import { buildOrderReceipt } from "./receipts";
+import { buildOrderReceipt, buildComplementReceipt } from "./receipts";
 import { buildEscposDocument } from "./escpos";
 import { getTransport } from "./transports";
 import type { ReceiptPreview } from "./types";
@@ -60,16 +60,50 @@ export async function printOrderReceipt(
     { name: settings.establishment?.name ?? "SHEKINAH", address: settings.establishment?.address }
   );
 
-  // 2) transporte plugável (preview default)
+  // 3) envia pelo transporte (helper compartilhado com a comanda complementar)
+  return sendToTransport(preview, settings);
+}
+
+/** Dados da comanda COMPLEMENTAR (adição ao pedido existente). */
+export interface PrintComplementData {
+  orderNumber: number;
+  customerName: string | null;
+  createdAt: string;
+  items: { product_name: string; quantity: number; unit_price?: number }[];
+  total: number;
+}
+
+/** Imprime a COMANDA COMPLEMENTAR (somente os novos itens adicionados).
+ *  Reutiliza o mesmo mecanismo da comanda normal (buildComplementReceipt +
+ *  transporte). Nunca lança — sempre devolve { ok, preview }.
+ */
+export async function printComplementReceipt(
+  complement: PrintComplementData,
+  settings: PrintSettings = {}
+): Promise<PrintResult> {
+  const preview = buildComplementReceipt(
+    {
+      orderNumber: complement.orderNumber,
+      customerName: complement.customerName,
+      createdAt: complement.createdAt,
+      items: complement.items,
+      total: complement.total,
+    },
+    { name: settings.establishment?.name ?? "SHEKINAH", address: settings.establishment?.address }
+  );
+
+  return sendToTransport(preview, settings);
+}
+
+/** Envia um documento ao transporte (preview mostra na tela; real envia bytes). */
+async function sendToTransport(preview: ReceiptPreview, settings: PrintSettings): Promise<PrintResult> {
   const transport = getTransport(settings.transport ?? "preview");
 
-  // preview não imprime fisicamente: consideramos "ok" apenas quando o
-  // transporte é real. Para 'preview' devolvemos ok=true (pré-visualização).
+  // preview não imprime fisicamente: ok=true (pré-visualização na tela).
   if (transport.id === "preview") {
     return { ok: true, preview };
   }
 
-  // 3) transporte real: gera bytes ESC/POS e envia
   try {
     const lines = preview.text.split("\n").map((text) => ({ text }));
     const bytes = new Uint8Array(buildEscposDocument(lines));

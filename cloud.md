@@ -490,6 +490,21 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **IMPLEMENTAÇÃO CONCLUÍDA (12/08/2026)**: comanda integrada ao fluxo de novo pedido (seção 11). `lib/printing/print.ts` (serviço desacoplado), comanda reformatada ao requisito oficial, integração no `new-order-form` (modal de confirmação + reimpressão), `createOrderAction` retorna itens com preço, migration `0021` (printed_at/print_attempts) aplicada no banco real. **Transporte físico ainda por definir** (depende da impressora escolhida) — default `preview`. Build OK.
 - **Mudanças de código relacionadas nesta data**: botões de voltar adicionados às telas secundárias (`components/back-button.tsx` + 10 telas), fix de UX no `mapOpenDayError` (abrir dia na mesma data), type-check e build OK. NÃO deployado — usuário fará deploy manual pelo terminal.
 
+### 12/08/2026 (noite) — FUNCIONALIDADE: ADICIONAR ITENS A UM PEDIDO EXISTENTE + COMANDA COMPLEMENTAR
+
+**Integrado à arquitetura existente (sem alteração de banco) — a lógica já existia na migration 0011 (RPC `add_items_to_order` + `order_complements`), faltava a integração de UI e impressão.**
+
+- **Server action** `addItemsAction` (`lib/auth/orders.ts`): chama a RPC `add_items_to_order` (ADRIGA, não substitui; locks `FOR UPDATE` anti-corrida; recalcula `orders.total` somando todos os itens; baixa estoque; cria `order_complements` para auditoria quem/quando; NÃO cria pedido novo; mantém id/cliente/status). Bloqueia pago/cancelado/entregue/dia fechado no banco. Mapeia erros.
+- **Impressão complementar** `printComplementReceipt` (`lib/printing/print.ts`): reutiliza `buildComplementReceipt` (comanda **COMPLEMENTO** com SOMENTE os novos itens) + refatoração de `sendToTransport` (mesmo mecanismo da comanda normal). Validado: gera `SHEKINAH / ** COMPLEMENTO ** / PEDIDO #N / CLIENTE / itens / VALOR / DATA-HORA`.
+- **UI** (`app/\(app\)/pedidos/`): botão **"＋ Adicionar itens"** no card do pedido (estados adicionáveis — mesmo critério do banco) + modal `add-items-modal.tsx` (cliente, nº pedido, itens atuais + total, seleção de novos produtos por categoria com `-qty+`/disp/ESGOTADO, total adicional, **[Cancelar] [Adicionar ao pedido]**). Ao confirmar: chama a action → imprime a comanda complementar (não bloqueia) → atualiza o total no board (Realtime refresca itens).
+- **`pedidos/page.tsx`**: passa `products` (ativos + disponibilidade do dia) ao board — mesmo padrão do novo pedido.
+- **Validação**: build OK; RPC confirmada no banco real; chamada sem sessão → `PERMISSAO_NEGADA` (segurança OK). Preço validado no banco (`PRECO_INVALIDO`).
+- **NÃO commitado/deployado ainda.**
+
+### 12/08/2026 (fim de tarde) — LIMPEZA VISUAL (UI comercial)
+
+- Removida exposição de rotas internas e detalhes técnicos ao usuário final (aparência de desenvolvimento): "Histórico e relatórios em /historico · SHEKINAH" → "Histórico e relatórios"; "Acesso restrito · SHEKINAH" → "Acesso restrito"; "Dia de operação · {id}" (UUID interno) removido; "Atualização automática · ..." no board de pedidos; "atômico no banco" no novo pedido; modal de impressão (removeu "depende do modelo... a definir"). Somente strings de apresentação — sem alteração de lógica/rotas/banco. Arquivos: `page.tsx`, `new-order-form.tsx`, `orders-board.tsx`, `print-preview-modal.tsx`.
+
 ### 12/08/2026 (tarde) — PROBLEMA DE PRODUÇÃO: NÃO CONSEGUE INICIAR UM NOVO DIA
 
 **Investigação concluída — causa raiz identificada. Correção PREPARADA localmente, NÃO aplicada ainda.**
@@ -533,20 +548,28 @@ REQUISITO OFICIAL DE IMPRESSÃO IMPLEMENTADO (12/08/2026): comanda física térm
 pedido (obrigatória junto com a tela da cozinha), desacoplada (falha não perde o pedido), com
 reimpressão e auditoria. Transporte físico real depende da impressora a escolher (default preview).
 Botões de voltar adicionados às telas secundárias. Ver seção 11.
-Dia atual no banco: 2026-08-11 FECHADO (sem dia aberto).
+ADICIONAR ITENS A PEDIDO EXISTENTE IMPLEMENTADO (12/08/2026, noite): botão "+ Adicionar itens" no
+board de pedidos + modal de seleção (cliente, itens atuais, novos produtos, total adicional) →
+RPC add_items_to_order (ADIÇÃO, sem duplicar, mantém id/cliente/status, recalcula total, auditoria
+order_complements) → impressão da COMANDA COMPLEMENTAR (somente novos itens). Sem alteração de banco
+(usada a RPC existente da migration 0011). Limpeza visual (exposição de rotas/detalhes técnicos)
+aplicada. NÃO commitado/deployado ainda.
+Dia atual no banco: 2026-08-11 (ABERTO — dia de teste para validação).
 
 ÚLTIMA ETAPA CONCLUÍDA:
 Revisão técnica completa validada: correções LOCAIS (build OK) + migrations 0018/0019 validadas no
-banco real (10/10 testes) + migration 0020 aplicada e verificada (reabrir mesmo dia).
+banco real (10/10 testes) + migration 0020 aplicada e verificada (reabrir mesmo dia) + ADICIONAR
+ITENS + COMANDA COMPLEMENTAR implementado (build OK).
 
 PRÓXIMA ETAPA:
 1) ✅ **Signup público DESATIVADO** no painel Supabase (usuário confirmou em 12/08/2026) — brecha da auditoria fechada.
-2) ✅ **Deploy no Vercel realizado pelo usuário** (via repositório GitHub) — 12/08/2026. Sistema no ar em URL `*.vercel.app`. **Deploy manual da última alteração (botões voltar + fix UX) pendente — usuário fará pelo terminal.**
+2) ✅ **Deploy no Vercel realizado pelo usuário** (via repositório GitHub) — 12/08/2026. Sistema no ar em URL `*.vercel.app`. **Deploy manual da última alteração (botões voltar + fix UX + impressão + adicionar itens + limpeza visual) pendente — usuário fará pelo terminal.**
 3) **Verificar variáveis de ambiente no Vercel** (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) — são obrigatórias e não são commitadas (`.env.local` fica fora do repositório). Sem elas o app não conecta ao Supabase.
 4) ✅ **Migration 0020 APLICADA** (reabrir mesmo dia) — 12/08/2026.
 5) ✅ **REQUISITO OFICIAL IMPRESSÃO IMPLEMENTADO (12/08/2026)** — comanda física integrada ao fluxo de novo pedido (desacoplada — falha de impressão não perde pedido; modal de confirmação + reimpressão). Migration `0021` (printed_at/print_attempts) aplicada no banco. **Pendente apenas o transporte físico REAL (rede/web-bluetooth/usb) — depende do modelo da impressora a escolher; default é preview.** Ver seção 11.
-6) Operação real: abrir um novo dia.
-7) Teste de anti-corrida concorrente real (pendente).
+6) ✅ **ADICIONAR ITENS + COMANDA COMPLEMENTAR IMPLEMENTADO (12/08/2026, noite)** — botão "+ Adicionar itens" no board de pedidos + modal (produtos com quantidade, total adicional) → RPC add_items_to_order → comanda complementar impressa (somente novos itens). **Sem alteração de banco. NÃO commitado ainda.**
+7) Operação real: abrir um novo dia.
+8) Teste de anti-corrida concorrente real (pendente).
 
 PROBLEMAS PENDENTES:
 - Confirmar que as variáveis de ambiente estão configuradas no Vercel (URL + anon key).
