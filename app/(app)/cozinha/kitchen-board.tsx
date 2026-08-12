@@ -193,15 +193,24 @@ export default function KitchenBoard({
                     <li
                       key={o.id}
                       className={`rounded-2xl border p-4 ${
-                        col.key === "novo"
-                          ? "border-red-300 bg-red-50"
-                          : "border-neutral-200"
+                        newIds.includes(o.id)
+                          ? "border-red-500 bg-red-100 animate-pulse"
+                          : col.key === "novo"
+                            ? "border-red-300 bg-red-50"
+                            : "border-neutral-200"
                       } shadow-sm`}
                     >
                       {/* Número + cliente */}
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-2xl font-black text-neutral-900">#{o.number}</p>
+                          <p className="text-2xl font-black text-neutral-900">
+                            #{o.number}
+                            {newIds.includes(o.id) && (
+                              <span className="ml-2 rounded bg-red-600 px-2 py-0.5 align-middle text-xs font-black text-white">
+                                NOVO!
+                              </span>
+                            )}
+                          </p>
                           <p className="text-sm font-bold uppercase text-neutral-700">
                             {o.customer_name ?? "Cliente"}
                           </p>

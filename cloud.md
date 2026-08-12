@@ -440,21 +440,27 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **Teste PWA executado**: build OK; assets servidos publicamente (manifest 200, sw.js 200, ícones 200), middleware ajustado para expor assets PWA sem login.
 - **AUDITORIA DE SEGURANÇA completa (12/08/2026)**: revisão de código + banco + testes de intrusão. Regras críticas validadas (estoque, dia, permissões, preço, duplicidade). Correções aplicadas (sem custo): migrations **0014** (RLS business_days/orders, troco só dinheiro, revoke helpers), **0015** (create_order refeito: loop único + search_path='' + order_id real), **0016/0017** (revoke de helpers com fix para manter RLS funcional). Achado principal a corrigir na configuração: **desativar signup público** no painel Supabase (recomendação documentada, ação de config).
 - **BATERIA COMPLETA DE TESTES (12/08/2026)**: 40 testes todos ✅ (20 fluxo principal + 11 permissões + 5 robustez + mobile). Nenhum problema encontrado — sem correções necessárias. Ver seção 13.
+- **REVISÃO TÉCNICA COMPLETA (12/08/2026)**: revisão como responsável técnico (código + fluxo + UX + mobile + impressão + banco). Fluxo do estabelecimento (abertura→...→encerrado) confirmado coberto pelas RPCs. Problemas encontrados e **corrigidos localmente (código)**:
+  - **UI**: botão "Cancelar" de pedido não pago (orders-board) chamando `cancel_order` — antes não havia como cancelar e o fechamento podia travar; troco no novo pedido corrigido (valor recebido → troco calculado); botão REGISTRAR PAGAMENTO com `disabled`/pending no caixa; `method` reseta ao abrir pagamento; **destaque de pedido novo na cozinha** (NOVO! com pulso) — antes o highlight era código morto.
+  - **Banco (migrations aplicadas)**: `0018` (pedido PRONTO + PAGO → ENTREGUE automático; RLS products: john vê inativos p/ reativar), `0019` (troco em dinheiro — valida pelo líquido `amount - change_given`, aceita excedente como troco).
+  - **Impressão**: `DOUBLE_H_ON` corrigido para `GS ! n` (era comando errado `ESC d`).
+- **VALIDAÇÃO DAS CORREÇÕES (banco real) CONCLUÍDA (12/08/2026)**: após autorização do usuário, o dia de teste foi removido e um dia novo aberto. **10/10 testes passaram**: dinheiro com TROCO (entrega R$200 → troco R$80, líquido = total, `paid=true`); **pronto + pago → ENTREGUE automático** + histórico `pronto→entregue`; `cancel_order` (status cancelado, estoque restaurado, cancelar pago bloqueado); RLS products **john vê inativos** (reativar). A revisão técnica está **concluída e validada**.
 
 ## 15. Estado atual
 
 ```
 ESTADO ATUAL DO PROJETO:
-Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0017,
+Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0019,
 11 tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída (regras críticas validadas + correções sem
-custo). BATERIA COMPLETA DE TESTES concluída (12/08/2026): 40 testes todos ✅ (20 fluxo principal +
-11 permissões + 5 robustez + mobile) — nenhum problema encontrado. Pendência de configuração: desativar
-signup público no Supabase. Sistema completo implementado e testado. Neste momento: dia 2026-08-11
-ENCERRADO (dados de teste da bateria).
+custo). BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅ (fluxo/permissões/robustez/mobile).
+REVISÃO TÉCNICA (12/08/2026) CONCLUÍDA E VALIDADA: correções de código (cancelar pedido, troco,
+pending no caixa, destaque de novo na cozinha, ESC/POS) + migrations 0018/0019 aplicadas e VALIDADAS
+no banco real (10/10: troco em dinheiro, pronto+pago=entregue, cancel_order, RLS inativos). Neste
+momento: dia 2026-08-11 ABERTO com 3 pedidos de teste da validação.
 
 ÚLTIMA ETAPA CONCLUÍDA:
-Bateria completa de testes (40/40 ✅): fluxo principal, permissões, robustez e mobile. Nenhuma correção
-necessária.
+Revisão técnica completa validada: correções LOCAIS (build OK) + migrations 0018/0019 validadas no
+banco real (10/10 testes).
 
 PRÓXIMA ETAPA:
 1) Ação recomendada (configuração): **desativar signup público** no painel Supabase (Authentication →
@@ -465,6 +471,7 @@ PRÓXIMA ETAPA:
 
 PROBLEMAS PENDENTES:
 - **Desativar signup público no Supabase** (recomendado pela auditoria; ação de configuração).
+- Há um dia ABERTO (2026-08-11) com 3 pedidos de teste da validação — pode ser limpo ao iniciar operação real.
 - Teste de anti-corrida concorrente (duas conexões simultâneas) ainda não executado.
 - Modelo/método da impressora INDEFINIDO — transportes reais são stubs até escolher o modelo.
 - Seed de produtos é exemplo; ajustar com o atendimento (John).
