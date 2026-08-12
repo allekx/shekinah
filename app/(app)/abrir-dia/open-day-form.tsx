@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useActionState, useState } from "react";
 import { openDay, type OpenDayResult } from "@/lib/auth/open-day";
@@ -57,8 +57,8 @@ export default function OpenDayForm({ products }: { products: Product[] }) {
       <form action={formAction} className="space-y-6">
         {/* Grade de estoque por categoria */}
         {Object.entries(byCategory).map(([category, list]) => (
-          <section key={category} className="rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+          <section key={category} className="sk-card p-4">
+            <h2 className="mb-3 sk-section-title">
               {category}
             </h2>
             <ul className="space-y-2">
@@ -113,8 +113,8 @@ export default function OpenDayForm({ products }: { products: Product[] }) {
         ))}
 
         {/* Caixa inicial */}
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+        <section className="sk-card p-4">
+          <h2 className="mb-3 sk-section-title">
             Caixa inicial
           </h2>
           <div className="flex items-center gap-3">

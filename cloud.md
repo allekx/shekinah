@@ -572,6 +572,7 @@ PRÓXIMA ETAPA:
 8) Teste de anti-corrida concorrente real (pendente).
 
 PROBLEMAS PENDENTES:
+- **PERFORMANCE — AUDITORIA REALIZADA (12/08/2026, seção 17)**: gargalo CRÍTICO (chamadas redundantes de auth/perfil) **CORRIGIDO** via `getUser`/`getRole` memoizados; login otimizado (sem `getUser()` redundante). Pendentes: bundle client (ALTO), paralelização, loading/skeleton, índices. Build OK, NÃO commitado.
 - Confirmar que as variáveis de ambiente estão configuradas no Vercel (URL + anon key).
 - Modelo/método da impressora INDEFINIDO — **fluxo de impressão web IMPLEMENTADO (comanda + preview + reimpressão); o TRANSPORTE físico real continua por definir até escolher o modelo da impressora (ver seção 11).**
 - Há um dia FECHADO (2026-08-11) com pedidos de teste — pode ser limpo ao iniciar operação real.
@@ -611,6 +612,94 @@ Auditoria completa realizada (revisão de código + banco + testes de intrusão 
 5. **`is_john`/`is_cozinha` executáveis por anon/public** (higiene) → revogado de anon/public (0016/0017); `authenticated` mantido (necessário às políticas RLS). ✅
 6. **Troco aceito em Pix/cartão** → bloqueado (`TROCO_SOMENTE_DINHEIRO`) (0014). ✅
 7. **`apply_payment_internal` exigia john** (já corrigido na 0013). ✅
+
+## 17. Auditoria de Performance (12/08/2026)
+
+**Auditoria realizada (somente leitura de código/banco + medições reais de produção). NENHUMA alteração feita. Nada implementado ainda — aguardando autorização.**
+
+### Contexto
+
+- Stack: Next.js 16.3 (App Router, Turbopack) no Vercel + Supabase (Postgres 17, região sa-east-1), RLS em todas as tabelas, gravações via RPC `SECURITY DEFINER`.
+- Produção: `https://shekinah-five.vercel.app`.
+
+### Métricas reais medidas (produção, curl)
+
+| Medida | Valor | Observação |
+|---|---|---|
+| TTFB `/login` (1ª carga) | **1.41s** | cold start da function serverless do Vercel |
+| TTFB `/login` (2ª/3ª) | **0.38–0.50s** | warm |
+| TTFB `/` (sem sessão → redirect 307 login) | **0.47s** | inclui `getUser()` do middleware |
+| Static asset (`manifest`) | **0.62s** | 1º acesso ao edge |
+| Bundle client (chunks `.js` maiores) | **251KB + 229KB + 134KB + 112KB** | ~727KB raw; dominado por `@supabase/supabase-js` |
+
+> Não foi possível medir com precisão o tempo de autenticação (login e-mail/senha) e o tempo até o dashboard sem uma sessão real/DevTools — **métrica não medida** (apenas estimada pela soma de latência de infra + chamadas redundantes).
+
+### Problemas encontrados (por severidade)
+
+#### 🔴 CRÍTICO — Chamadas de autenticação/perfil REDUNDANTES em toda rota autenticada
+- Em cada request a rota autenticada, o Supabase é consultado **3 vezes** para a MESMA informação:
+  1. **middleware.ts**: `supabase.auth.getUser()` + `SELECT profiles.role` (para guarda por perfil).
+  2. **`(app)/layout.tsx`**: `getUser()` + `SELECT profiles`.
+  3. **a própria página** (13 páginas): `getUser()` + `SELECT profiles`.
+- **Total: 6+ chamadas ao Supabase por request** (2× `/auth/v1/user` + consultas a `profiles`), em sequência (não paralelas). Isso é a causa estrutural da "sensação de lentidão" ao navegar e após o login.
+- **Onde**: `middleware.ts` (linhas 46–92), `app/(app)/layout.tsx` (14–27), e em cada `page.tsx` do app.
+
+#### 🔴 ALTO — Bundle client inflado pelo Supabase client
+- `@supabase/supabase-js` (718K) + `@supabase/ssr` (539K) são carregados no cliente pelos componentes `kitchen-board.tsx` e `orders-board.tsx` (`createClient()` client-side) e por `connection-banner`/`sw-register`.
+- Chunks de até 251KB/229KB → **~727KB raw de JS** (~250KB gzipped) no navegador; aumenta o tempo até a interface interativa.
+- **Onde**: `lib/supabase/client.ts` + componentes client que o usam.
+
+#### 🟡 MÉDIO — Login: espera por perfil em sequência
+- `login()` (server action) faz `signInWithPassword` → `getUser()` → `SELECT profiles` **em sequência**. O `getUser()` após o sign-in é redundante (o `signInWithPassword` já retorna a sessão); e o SELECT de perfil poderia ser evitado (o middleware já decide o redirect por perfil). Adiciona ~1 RTT ao login.
+
+#### 🟡 MÉDIO — SELECT `profiles` por página (mesmo sem precisar do papel na página)
+- Muitas páginas (ex.: `pedidos/novo`, `estoque`, `caixa`) fazem o `SELECT profiles.role` **apenas para checar permissão**, mas o **middleware já garantiu** john/cozinha. É um roundtrip extra por navegação.
+
+#### 🟡 MÉDIO — Consultas sequenciais que poderiam ser paralelas
+- `pedidos/page.tsx`: carrega `orders` e `order_items` em `Promise.all` (bom), mas o `getUser()`+`profiles`+`day` são sequenciais antes. Algumas páginas fazem `getUser()` → `profiles` → `day` → dados, tudo em sequência.
+- `relatorio/[dayId]/page.tsx`: 2× `SELECT profiles` (abertura + responsável) — 1 pode ser reutilizado.
+
+#### 🟢 BAIXO — `stock_movements` sem índice em `business_day_id`
+- `estoque/page.tsx` consulta `stock_movements` por `business_day_id`; a tabela **só tem pkey** (sem índice na coluna de filtro) → full scan conforme cresce. (Recomendação de índice; NÃO criado.)
+
+#### 🟢 BAIXO — `profiles` sem índice em `email`
+- Usado pelo trigger `handle_new_user` e (potencialmente) por consultas; só tem pkey por id. Não crítico hoje (volume baixo).
+
+#### 🟢 BAIXO — Sem `loading.tsx`/Suspense nas rotas dinâmicas
+- As páginas server renderizam só após TODAS as consultas resolverem (padrão "espera tudo carregar"). Não há skeleton/loading → a interface "aparece de uma vez" após o fetch, ampliando a sensação de lentidão.
+
+### O que está OK (não alterar)
+
+- Índices de `orders` (business_day_id, status, number) e `daily_stock` (business_day_id, product_id) são adequados.
+- Realtime só em `orders` (necessário para cozinha/pedidos); sem abusos.
+- Server actions com RPC atômica (sem chamadas duplicadas na criação de pedido — o `createOrderAction` faz 1 RPC + 1 SELECT products para nomes).
+- Sem API routes, sem `dangerouslySetInnerHTML`, RLS em todas as tabelas.
+
+### Otimizações recomendadas (por impacto/risco — NÃO implementadas)
+
+1. **✅ CRÍTICO — Eliminar chamadas redundantes de auth/perfil (IMPLEMENTADO em 12/08/2026)**:
+   - **Solução aplicada**: `lib/supabase/server.ts` agora exporta `getUser` e `getRole` **memoizados via React `cache()`** (uma única chamada ao Supabase por request). O `(app)/layout.tsx` e todas as páginas usam `getRole()`/`getUser()` — eliminando o `getUser()` + `SELECT profiles` duplicado (antes: middleware + layout + cada página = ~6 chamadas; agora: 1 de cada, compartilhadas por request).
+   - Login: `signInWithPassword` não é seguido de `getUser()` redundante; usa `getRole()` para o redirect por perfil.
+   - O middleware permanece com sua guarda por perfil em borda (necessária e executada uma vez por request).
+   - Build OK. **Segurança preservada** (RLS + RPCs continuam validando papel; o `getRole()` é a fonte única por request).
+2. **ALTO — Reduzir o bundle client** (NÃO implementado):
+   - Usar `createClient()` client-side **somente** nos componentes que precisam de Realtime (kitchen/orders boards). Os demais client components não precisam do supabase-js.
+   - `dynamic import`/lazy dos boards (que são pesados) e/ou manter o supabase-js só onde necessário.
+   - Impacto: JS inicial menor → interface interativa mais cedo.
+3. **✅ MÉDIO — Login mais rápido (IMPLEMENTADO em 12/08/2026)**: `signInWithPassword` não é seguido de `getUser()` redundante (a resposta já traz o usuário); redirect por perfil via `getRole()`. −1 RTT no login.
+4. **MÉDIO — Paralelizar consultas server** (NÃO implementado):
+   - Agrupar `getUser` + `profiles` + `day` + dados em `Promise.all` onde hoje é sequencial (ex.: home).
+   - Impacto: reduz tempo até a renderização.
+5. **MÉDIO — Adicionar `loading.tsx`/Suspense** nas rotas que fazem múltiplas consultas (dashboard, pedidos, caixa) com skeleton leve → interface aparece antes. (NÃO implementado)
+6. **BAIXO — Índices recomendados** (documentar apenas; aplicar com autorização):
+   - `CREATE INDEX idx_stock_movements_day ON stock_movements(business_day_id);`
+   - `CREATE INDEX idx_profiles_email ON profiles(email);` (se usado por auth/gestão)
+
+### Próxima etapa
+
+- **Otimizações 1 (CRÍTICO) e 3 (login) IMPLEMENTADAS em 12/08/2026** (build OK, NÃO commitado ainda).
+- **Aguardando autorização para**: (2) reduzir bundle client → (4) paralelizar consultas → (5) loading/skeleton → (6) índices (com revisão).
+- Alterações atuais não commitadas (aguardando revisão).
 
 ### Recomendações documentadas (NÃO implementadas — não geram custo, mas são boas práticas)
 

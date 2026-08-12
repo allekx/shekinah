@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import KitchenBoard from "./kitchen-board";
 
@@ -8,18 +8,9 @@ import KitchenBoard from "./kitchen-board";
  */
 export default async function CozinhaPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
 
   // Segurança: somente cozinha (o middleware redireciona john para /).
-  if (!profile || profile.role !== "cozinha") {
+  if ((await getRole()) !== "cozinha") {
     redirect("/");
   }
 

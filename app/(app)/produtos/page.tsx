@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import BackButton from "@/components/back-button";
 import ProductForm from "./product-form";
@@ -7,17 +7,9 @@ import ProductList from "./product-list";
 /** Gerenciamento de produtos (somente john). */
 export default async function ProdutosPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
-
-  if (profile?.role !== "john") {
+  // Papel memoizado (mesma consulta do layout — uma única vez por request).
+  if ((await getRole()) !== "john") {
     redirect("/");
   }
 

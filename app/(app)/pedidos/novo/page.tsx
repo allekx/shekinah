@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import NewOrderForm from "./new-order-form";
 
@@ -8,17 +8,8 @@ import NewOrderForm from "./new-order-form";
  */
 export default async function NovoPedidoPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
-
-  if (profile?.role !== "john") {
+  if ((await getRole()) !== "john") {
     redirect("/");
   }
 

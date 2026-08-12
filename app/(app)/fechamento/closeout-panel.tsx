@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { closeDay } from "@/lib/auth/close-day";
@@ -71,8 +71,8 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
         </section>
 
         {day.cash_difference !== null && (
-          <section className="rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+          <section className="sk-card p-4">
+            <h2 className="mb-3 sk-section-title">
               Resultado do caixa
             </h2>
             <Row label="Dinheiro esperado" value={fmtBRL(expectedCash)} />
@@ -131,8 +131,8 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
       )}
 
       {/* Vendas */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">Vendas</h2>
+      <section className="sk-card p-4">
+        <h2 className="mb-3 sk-section-title">Vendas</h2>
         <Row label="Quantidade de pedidos" value={String(closeout?.orders_total ?? 0)} />
         <Row label="Total vendido" value={fmtBRL(totalSales)} strong />
         <Row label="Dinheiro" value={fmtBRL(cashCash)} />
@@ -141,8 +141,8 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
       </section>
 
       {/* Caixa */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">Caixa</h2>
+      <section className="sk-card p-4">
+        <h2 className="mb-3 sk-section-title">Caixa</h2>
         <Row label="Caixa inicial" value={fmtBRL(initialCash)} />
         <Row label="Vendas em dinheiro" value={fmtBRL(cashCash)} />
         <div className="mt-2 rounded-xl bg-blue-50 px-4 py-2">
@@ -179,8 +179,8 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
       </section>
 
       {/* Estoque final esperado x contado */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+      <section className="sk-card p-4">
+        <h2 className="mb-3 sk-section-title">
           Estoque final
         </h2>
         <p className="mb-3 text-xs text-neutral-500">

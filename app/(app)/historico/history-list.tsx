@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import BackButton from "@/components/back-button";
 
@@ -42,7 +42,7 @@ export default function HistoryList({ days }: { days: HistoryDay[] }) {
             <li key={d.id}>
               <a
                 href={`/relatorio/${d.id}`}
-                className="block rounded-2xl bg-white p-4 shadow-sm transition active:scale-[.99]"
+                className="block sk-card p-4 transition active:scale-[.99]"
               >
                 <div className="flex items-center justify-between">
                   <p className="text-lg font-black text-neutral-900">

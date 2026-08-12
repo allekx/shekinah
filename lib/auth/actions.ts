@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getRole } from "@/lib/supabase/server";
 
 interface LoginState {
   error?: string;
@@ -11,6 +11,10 @@ interface LoginState {
 /** Faz login com e-mail e senha. Usuários são criados pelo admin
  *  no painel do Supabase (sem cadastro público). Após autenticar,
  *  redireciona por perfil (john → /, cozinha → /cozinha).
+ *
+ *  Otimizado: o signInWithPassword já devolve a sessão/usuário (não há
+ *  necessidade de um segundo getUser()); o papel é resolvido por getRole()
+ *  (memoizado) para o redirect por perfil.
  */
 export async function login(
   _prevState: LoginState,
@@ -31,18 +35,11 @@ export async function login(
     return { error: "E-mail ou senha inválidos." };
   }
 
-  // Busca o perfil para direcionar por papel.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
+  // Redireciona por papel (memoizado). O middleware também garante a guarda.
+  const role = await getRole();
 
   revalidatePath("/", "layout");
-  redirect(profile?.role === "cozinha" ? "/cozinha" : "/");
+  redirect(role === "cozinha" ? "/cozinha" : "/");
 }
 
 /** Faz logout: encerra a sessão no Supabase e volta ao login. */

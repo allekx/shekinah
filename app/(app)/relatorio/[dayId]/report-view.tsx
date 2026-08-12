@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo } from "react";
 import { buildCloseoutReceipt } from "@/lib/printing/receipts";
@@ -108,8 +108,8 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
       </section>
 
       {/* Vendas */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">Vendas</h2>
+      <section className="sk-card p-4">
+        <h2 className="mb-2 sk-section-title">Vendas</h2>
         <Row label="Pedidos" value={String(closeout?.orders_total ?? 0)} />
         <Row label="Total vendido" value={fmtBRL(Number(closeout?.total_sales ?? 0))} strong />
         <Row label="Dinheiro" value={fmtBRL(Number(pm.dinheiro ?? 0))} />
@@ -118,8 +118,8 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
       </section>
 
       {/* Caixa */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">Caixa</h2>
+      <section className="sk-card p-4">
+        <h2 className="mb-2 sk-section-title">Caixa</h2>
         <Row label="Caixa inicial" value={fmtBRL(Number(closeout?.initial_cash ?? 0))} />
         <Row label="Dinheiro esperado" value={fmtBRL(Number(closeout?.expected_cash ?? 0))} />
         <Row label="Dinheiro contado" value={fmtBRL(day.counted_cash ?? 0)} />
@@ -138,8 +138,8 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
       </section>
 
       {/* Estoque */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">Estoque</h2>
+      <section className="sk-card p-4">
+        <h2 className="mb-2 sk-section-title">Estoque</h2>
         {stock.length === 0 && <p className="text-sm text-neutral-400">Sem produtos com estoque.</p>}
         <ul className="space-y-2">
           {stock.map((s) => (
@@ -154,8 +154,8 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
       </section>
 
       {/* Status */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">Status</h2>
+      <section className="sk-card p-4">
+        <h2 className="mb-2 sk-section-title">Status</h2>
         <p className="text-base font-black text-neutral-900">{day.status === "fechado" ? "FECHADO" : "ABERTO"}</p>
       </section>
 

@@ -1,12 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 /** Rota /relatorio (sem id): redireciona ao último dia de operação. */
 export default async function RelatorioPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getUser();
 
   if (!user) redirect("/login");
 

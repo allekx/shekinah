@@ -42,7 +42,7 @@ interface ColumnDef {
 
 const COLUMNS: ColumnDef[] = [
   { key: "novo", label: "NOVOS", dot: "bg-red-500", ring: "border-red-200" },
-  { key: "em_preparo", label: "EM PREPARO", dot: "bg-yellow-500", ring: "border-yellow-300" },
+  { key: "em_preparo", label: "EM PREPARO", dot: "bg-amber-500", ring: "border-amber-300" },
   { key: "pronto", label: "PRONTOS", dot: "bg-green-500", ring: "border-green-300" },
   { key: "entregue", label: "FINALIZADOS", dot: "bg-neutral-400", ring: "border-neutral-200" },
 ];
@@ -197,7 +197,7 @@ export default function OrdersBoard({
           const list = byStatus(col.key);
           const prontoTotal = list.filter((o) => o.status === "pronto").length;
           return (
-            <div key={col.key} className={`rounded-2xl bg-white p-3 shadow-sm ${col.ring} border-l-4`}>
+            <div key={col.key} className={`rounded-2xl bg-white p-3 shadow-[0_2px_10px_rgb(23_25_35_/0.05)] ${col.ring} border-l-4`}>
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-neutral-700">
                 <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} />
                 {col.label} ({list.length})
@@ -210,11 +210,11 @@ export default function OrdersBoard({
                   {list.map((o) => (
                     <li
                       key={o.id}
-                      className={`rounded-xl border p-3 ${
+                      className={`rounded-xl border p-3 transition ${
                         o.status === "pronto"
-                          ? "border-green-300 bg-green-50"
-                          : "border-neutral-200"
-                      }`}
+                          ? "border-green-200 bg-green-50/70"
+                          : "border-neutral-200 bg-white"
+                      } shadow-[0_1px_2px_rgb(23_25_35_/0.04)]`}
                     >
                       {/* Número + horário */}
                       <div className="flex items-center justify-between">
@@ -262,7 +262,7 @@ export default function OrdersBoard({
                             <button
                               type="button"
                               onClick={() => setAddFor(o)}
-                              className="flex-1 rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-bold text-blue-700"
+                              className="flex-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                             >
                               ＋ Adicionar itens
                             </button>
@@ -281,7 +281,7 @@ export default function OrdersBoard({
                                 onClick={(e) => {
                                   if (!confirm("Cancelar este pedido? O estoque será devolvido.")) e.preventDefault();
                                 }}
-                                className="w-full rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700"
+                                className="w-full rounded-lg border border-red-100 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100"
                               >
                                 Cancelar
                               </button>

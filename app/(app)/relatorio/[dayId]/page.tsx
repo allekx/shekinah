@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getRole } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import ReportView from "./report-view";
 
@@ -12,17 +12,8 @@ export default async function RelatorioDiaPage({
 }) {
   const { dayId } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
-
-  if (profile?.role !== "john") {
+  if ((await getRole()) !== "john") {
     redirect("/");
   }
 

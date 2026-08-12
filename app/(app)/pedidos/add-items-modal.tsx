@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { addItemsAction } from "@/lib/auth/orders";
@@ -177,7 +177,7 @@ export default function AddItemsModal({
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {Object.entries(byCategory).map(([category, list]) => (
             <section key={category} className="mb-4">
-              <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-neutral-500">
+              <h3 className="mb-2 sk-section-title">
                 {category}
               </h3>
               <ul className="space-y-2">

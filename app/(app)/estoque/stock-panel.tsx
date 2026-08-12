@@ -56,8 +56,8 @@ export default function StockPanel({
       </header>
 
       {/* Saldo por produto */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">
           Saldo do dia
         </h2>
         <ul className="space-y-2">
@@ -159,8 +159,8 @@ export default function StockPanel({
       </section>
 
       {/* Histórico de movimentações */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">
           Movimentações
         </h2>
         {movements.length === 0 ? (

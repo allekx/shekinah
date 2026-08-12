@@ -157,17 +157,17 @@ export default function KitchenBoard({
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-100">
+    <div className="flex min-h-screen flex-col bg-[#eef0f3]">
       {/* Header enxuto */}
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-neutral-200/80 bg-white/90 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <BackButton />
           <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-neutral-700">Cozinha</p>
-            <p className="text-xs text-neutral-500">{dayLabel}</p>
+            <p className="text-sm font-bold uppercase tracking-wider text-neutral-800">Cozinha</p>
+            <p className="text-xs font-medium text-neutral-500">{dayLabel}</p>
           </div>
         </div>
-        <span className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-bold text-white">
+        <span className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-bold text-white shadow-sm">
           {orders.filter((o) => o.status !== "pronto").length} a fazer
         </span>
       </header>
@@ -183,7 +183,7 @@ export default function KitchenBoard({
         {COLUMNS.map((col) => {
           const list = byStatus(col.key);
           return (
-            <section key={col.key} className={`rounded-2xl bg-white p-3 shadow-sm ${col.ring} border-l-4`}>
+            <section key={col.key} className={`rounded-2xl bg-white p-3 shadow-[0_2px_10px_rgb(23_25_35_/0.05)] ${col.ring} border-l-4`}>
               <h2 className="mb-3 flex items-center gap-2 text-base font-black uppercase tracking-wide text-neutral-800">
                 <span className={`h-3 w-3 rounded-full ${col.dot}`} />
                 {col.label} ({list.length})
@@ -196,13 +196,13 @@ export default function KitchenBoard({
                   {list.map((o) => (
                     <li
                       key={o.id}
-                      className={`rounded-2xl border p-4 ${
+                      className={`rounded-2xl border transition ${
                         newIds.includes(o.id)
                           ? "border-red-500 bg-red-100 animate-pulse"
                           : col.key === "novo"
-                            ? "border-red-300 bg-red-50"
-                            : "border-neutral-200"
-                      } shadow-sm`}
+                            ? "border-red-200 bg-red-50/60"
+                            : "border-neutral-200 bg-white"
+                      } shadow-[0_1px_3px_rgb(23_25_35_/0.06)]`}
                     >
                       {/* Número + cliente */}
                       <div className="flex items-start justify-between">

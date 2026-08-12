@@ -125,7 +125,7 @@ export default function NewOrderForm({
 
       <form ref={formRef} action={formAction} className="space-y-5">
         {/* Nome do cliente */}
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
+        <section className="sk-card p-4">
           <label className="mb-2 block text-sm font-semibold text-neutral-700">
             Nome do cliente
           </label>
@@ -134,14 +134,14 @@ export default function NewOrderForm({
             value={customer}
             onChange={(e) => setCustomer(e.target.value)}
             placeholder="Ex.: João"
-            className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-base outline-none focus:border-blue-500"
+            className="sk-input"
           />
         </section>
 
         {/* Produtos por categoria */}
         {Object.entries(byCategory).map(([category, list]) => (
-          <section key={category} className="rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+          <section key={category} className="sk-card p-4">
+            <h2 className="sk-section-title mb-3">
               {category}
             </h2>
             <ul className="space-y-2">
@@ -223,7 +223,7 @@ export default function NewOrderForm({
 
         {/* Resumo do pedido */}
         {selectedItems.length > 0 && (
-          <section className="rounded-2xl bg-neutral-900 p-4 text-white">
+          <section className="rounded-[1rem] bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 p-4 text-white shadow-[0_10px_24px_rgb(23_25_35_/0.15)]">
             <div className="space-y-1">
               {selectedItems.map((it) => {
                 const p = products.find((x) => x.id === it.product_id);
@@ -250,8 +250,8 @@ export default function NewOrderForm({
         )}
 
         {/* Forma de pagamento */}
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+        <section className="sk-card p-4">
+          <h2 className="sk-section-title mb-3">
             Pagamento
           </h2>
           <div className="grid grid-cols-3 gap-2">
@@ -292,7 +292,7 @@ export default function NewOrderForm({
                 inputMode="decimal"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-2xl font-bold outline-none focus:border-blue-500"
+                className="sk-input text-2xl font-bold tabular-nums"
               />
 
               {paymentMethod === "dinheiro" && (() => {
@@ -333,7 +333,7 @@ export default function NewOrderForm({
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit || pending || submitted}
-              className="w-full rounded-2xl bg-green-600 py-5 text-center text-lg font-black text-white transition active:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-[1rem] bg-gradient-to-b from-[#16a34a] to-[#12853b] py-5 text-center text-lg font-extrabold tracking-tight text-white shadow-lg shadow-[#16a34a]/25 transition hover:from-[#179a47] hover:to-[#0f7a36] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pending ? "Enviando…" : submitted ? "Processando…" : "FINALIZAR PEDIDO"}
             </button>

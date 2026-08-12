@@ -66,8 +66,8 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
       )}
 
       {/* Resumo financeiro */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">Resumo do caixa</h2>
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">Resumo do caixa</h2>
         <dl className="space-y-2">
           <Row label="Caixa inicial" value={fmtBRL(initialCash)} />
           <Row label="Vendas em dinheiro" value={fmtBRL(cashCash)} />
@@ -75,16 +75,16 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
           <Row label="Vendas via cartão" value={fmtBRL(cardCash)} />
           <Row label="Total vendido" value={fmtBRL(totalSales)} strong />
         </dl>
-        <div className="mt-3 rounded-xl bg-blue-50 px-4 py-3">
-          <p className="text-sm font-semibold text-blue-800">DINHEIRO ESPERADO</p>
-          <p className="text-2xl font-black text-blue-900">{fmtBRL(expectedCash)}</p>
-          <p className="text-xs text-blue-600">caixa inicial + vendas em dinheiro</p>
+        <div className="mt-3 rounded-xl bg-gradient-to-br from-[#eef4ff] to-[#e0ebff] px-4 py-3 ring-1 ring-[#2e54c9]/10">
+          <p className="text-sm font-bold uppercase tracking-wide text-[#2844a8]">Dinheiro esperado</p>
+          <p className="sk-figure mt-0.5 text-2xl text-[#1f3a8c]">{fmtBRL(expectedCash)}</p>
+          <p className="text-xs text-[#2e54c9]/80">caixa inicial + vendas em dinheiro</p>
         </div>
       </section>
 
       {/* Conferência */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">Conferência</h2>
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">Conferência</h2>
         <label className="mb-1 block text-sm font-semibold text-neutral-700">Dinheiro contado</label>
         <div className="flex items-center gap-2">
           <span className="text-xl font-bold text-neutral-500">R$</span>
@@ -93,7 +93,7 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
             onChange={(e) => setCountedCash(e.target.value)}
             inputMode="decimal"
             placeholder="0,00"
-            className="h-12 w-full rounded-xl border border-neutral-300 px-4 text-2xl font-bold outline-none focus:border-blue-500"
+            className="sk-input h-12 text-2xl font-bold tabular-nums"
           />
         </div>
         <div
@@ -119,8 +119,8 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
       </section>
 
       {/* Pedidos a receber */}
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">
           Receber ({pendingOrders.length})
         </h2>
 
@@ -132,7 +132,7 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
 
         <ul className="space-y-2">
           {pendingOrders.map((o) => (
-            <li key={o.id} className="rounded-xl border border-neutral-200 p-3">
+            <li key={o.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-[0_1px_2px_rgb(23_25_35_/0.04)]">
               {paymentFor === o.id ? (
                 <form
                   className="space-y-3"

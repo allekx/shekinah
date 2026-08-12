@@ -14,7 +14,7 @@ export default function BackButton() {
       type="button"
       onClick={() => router.back()}
       aria-label="Voltar"
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-700 shadow-sm transition active:bg-neutral-100"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-600 shadow-sm transition hover:border-neutral-300 hover:text-neutral-900 active:translate-y-px active:bg-neutral-50"
     >
       <svg
         width="20"
