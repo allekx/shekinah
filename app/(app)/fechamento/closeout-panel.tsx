@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { closeDay } from "@/lib/auth/close-day";
+import BackButton from "@/components/back-button";
 
 interface CloseoutProps {
   day: {
@@ -113,11 +114,14 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
 
   return (
     <div className="space-y-5 pb-24">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Encerrar dia</h1>
-        <p className="text-sm text-neutral-500">
-          Confira tudo antes de confirmar o fechamento.
-        </p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Encerrar dia</h1>
+          <p className="text-sm text-neutral-500">
+            Confira tudo antes de confirmar o fechamento.
+          </p>
+        </div>
       </header>
 
       {closeoutError && (

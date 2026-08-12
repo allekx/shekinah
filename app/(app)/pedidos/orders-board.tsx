@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cancelOrderAction } from "@/lib/auth/orders";
+import BackButton from "@/components/back-button";
 
 interface OrderItemLite {
   product_name: string;
@@ -145,11 +146,14 @@ export default function OrdersBoard({ dayId, orders: initial }: { dayId: string;
           {actionError}
         </p>
       )}
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Pedidos do dia</h1>
-        <p className="text-sm text-neutral-500">
-          Atualização automática · {orders.filter((o) => o.status !== "cancelado").length} pedido(s) ativo(s)
-        </p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Pedidos do dia</h1>
+          <p className="text-sm text-neutral-500">
+            Atualização automática · {orders.filter((o) => o.status !== "cancelado").length} pedido(s) ativo(s)
+          </p>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

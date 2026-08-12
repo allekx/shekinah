@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { updateStatusAction } from "@/lib/auth/kitchen";
+import BackButton from "@/components/back-button";
 
 interface KitchenItem {
   name: string;
@@ -158,10 +159,13 @@ export default function KitchenBoard({
   return (
     <div className="flex min-h-screen flex-col bg-neutral-100">
       {/* Header enxuto */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-wide text-neutral-700">Cozinha</p>
-          <p className="text-xs text-neutral-500">{dayLabel}</p>
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-2">
+          <BackButton />
+          <div>
+            <p className="text-sm font-bold uppercase tracking-wide text-neutral-700">Cozinha</p>
+            <p className="text-xs text-neutral-500">{dayLabel}</p>
+          </div>
         </div>
         <span className="rounded-lg bg-neutral-900 px-3 py-1.5 text-sm font-bold text-white">
           {orders.filter((o) => o.status !== "pronto").length} a fazer

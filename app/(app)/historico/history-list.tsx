@@ -1,5 +1,7 @@
 "use client";
 
+import BackButton from "@/components/back-button";
+
 interface HistoryDay {
   id: string;
   day: string;
@@ -19,9 +21,12 @@ const fmtBRL = (v: number) =>
 export default function HistoryList({ days }: { days: HistoryDay[] }) {
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Histórico</h1>
-        <p className="text-sm text-neutral-500">Dias de operação encerrados.</p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Histórico</h1>
+          <p className="text-sm text-neutral-500">Dias de operação encerrados.</p>
+        </div>
       </header>
 
       {days.length === 0 && (

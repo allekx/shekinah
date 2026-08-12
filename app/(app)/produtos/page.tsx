@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import BackButton from "@/components/back-button";
 import ProductForm from "./product-form";
 import ProductList from "./product-list";
 
@@ -29,11 +30,14 @@ export default async function ProdutosPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Produtos</h1>
-        <p className="text-sm text-neutral-500">
-          Gerencie nome, categoria, preço e disponibilidade.
-        </p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Produtos</h1>
+          <p className="text-sm text-neutral-500">
+            Gerencie nome, categoria, preço e disponibilidade.
+          </p>
+        </div>
       </header>
 
       <ProductForm />

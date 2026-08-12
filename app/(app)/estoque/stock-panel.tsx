@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { adjustStockAction } from "@/lib/auth/stock";
+import BackButton from "@/components/back-button";
 
 interface StockLine {
   product_id: number;
@@ -46,9 +47,12 @@ export default function StockPanel({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Estoque</h1>
-        <p className="text-sm text-neutral-500">Controle do dia de operação.</p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Estoque</h1>
+          <p className="text-sm text-neutral-500">Controle do dia de operação.</p>
+        </div>
       </header>
 
       {/* Saldo por produto */}

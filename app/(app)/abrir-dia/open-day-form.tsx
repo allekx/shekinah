@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { openDay, type OpenDayResult } from "@/lib/auth/open-day";
+import BackButton from "@/components/back-button";
 
 interface Product {
   id: number;
@@ -43,11 +44,14 @@ export default function OpenDayForm({ products }: { products: Product[] }) {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Iniciar dia</h1>
-        <p className="text-sm text-neutral-500">
-          Informe o estoque inicial e o caixa inicial.
-        </p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Iniciar dia</h1>
+          <p className="text-sm text-neutral-500">
+            Informe o estoque inicial e o caixa inicial.
+          </p>
+        </div>
       </header>
 
       <form action={formAction} className="space-y-6">

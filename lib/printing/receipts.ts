@@ -17,6 +17,8 @@ interface OrderItem {
   product_name: string;
   quantity: number;
   complementary?: boolean;
+  /** Preço unitário — usado para mostrar o subtotal por item na comanda. */
+  unit_price?: number;
 }
 
 interface OrderData {
@@ -33,6 +35,24 @@ function fmtDateTime(iso: string): string {
   return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Apenas data DD/MM/YYYY. */
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
+/** Apenas hora HH:MM. */
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Monta uma linha com item à esquerda e valor à direita (colunas fixas). */
+function itemRow(b: TextBuilder, width: number, left: string, right: string) {
+  const r = right.toString();
+  const leftMax = Math.max(1, width - r.length - 2);
+  const lv = left.length > leftMax ? left.slice(0, leftMax - 1) + "…" : left;
+  b.addLine({ text: ` ${lv}${" ".repeat(Math.max(1, width - lv.length - r.length))}${r}`, align: "left" });
+}
+
 function fmtBRL(v: number): string {
   return "R$ " + v.toFixed(2).replace(".", ",");
 }
@@ -44,22 +64,30 @@ function header(est: Establishment, b: TextBuilder) {
   b.addDivider();
 }
 
-/** COMANDA do pedido (requisito). */
+/** COMANDA do pedido (requisito oficial). */
 export function buildOrderReceipt(order: OrderData, est: Establishment): ReceiptPreview {
   const b = new TextBuilder(DEFAULT_WIDTH);
   header(est, b);
   b.addLine("");
-  b.addLine({ text: `PEDIDO #${String(order.number).padStart(3, "0")}`, align: "center", bold: true });
-  b.addLine(`CLIENTE: ${order.customer_name ?? "—"}`);
+  b.addLine({ text: `Comanda #${String(order.number).padStart(3, "0")}`, align: "center", bold: true });
+  b.addLine(`Cliente: ${order.customer_name ?? "—"}`);
   b.addDivider();
   for (const it of order.items) {
-    b.addLine(
-      `${it.quantity}x ${it.product_name}${it.complementary ? " 🔔" : ""}`
-    );
+    // item à esquerda + subtotal à direita (formato do requisito oficial)
+    const subtotal = fmtBRL((it.unit_price ?? 0) * it.quantity);
+    itemRow(b, DEFAULT_WIDTH, `${it.quantity}x ${it.product_name}`, subtotal);
   }
   b.addDivider();
-  b.addLine({ text: `TOTAL: ${fmtBRL(order.total)}`, bold: true });
-  b.addLine("DATA/HORA: " + fmtDateTime(order.created_at));
+  // linha total em NEGRITO (duas colunas: rótulo à esquerda, valor à direita)
+  const totalW = b.width;
+  const totalRight = fmtBRL(order.total);
+  b.addLine({
+    text: `TOTAL${" ".repeat(Math.max(1, totalW - ("TOTAL").length - totalRight.length))}${totalRight}`,
+    bold: true,
+  });
+  b.addBlank();
+  b.addLine("Data: " + fmtDate(order.created_at));
+  b.addLine(`Hora: ${fmtTime(order.created_at)}`);
   b.addBlank();
   b.addLine("");
   return { kind: "comanda", text: b.build(), width: b.width };

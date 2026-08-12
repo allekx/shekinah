@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import BackButton from "@/components/back-button";
 import StockPanel from "./stock-panel";
 
 /** Estoque operacional do dia aberto (somente john).
@@ -33,7 +34,10 @@ export default async function EstoquePage() {
   if (!day) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-neutral-900">Estoque</h1>
+        <header className="flex items-center gap-3">
+          <BackButton />
+          <h1 className="text-xl font-bold text-neutral-900">Estoque</h1>
+        </header>
         <p className="rounded-2xl bg-white p-5 text-center text-sm text-neutral-500 shadow-sm">
           Nenhum dia aberto. Inicie o dia para controlar o estoque.
         </p>

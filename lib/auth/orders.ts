@@ -7,6 +7,8 @@ export interface CreateOrderResult {
   error?: string;
   orderId?: string;
   orderNumber?: number;
+  /** Itens do pedido (snapshot) — usado para montar a comanda de impressão. */
+  items?: { product_name: string; quantity: number; unit_price: number }[];
 }
 
 export interface OrderItemInput {
@@ -93,6 +95,17 @@ export async function createOrderAction(
     }
   }
 
+  // Busca o nome do produto no catálogo (para a comanda de impressão).
+  const idsInItems = items.map((it) => it.product_id);
+  const namesById: Record<number, string> = {};
+  if (idsInItems.length > 0) {
+    const { data: catalog } = await supabase
+      .from("products")
+      .select("id, name")
+      .in("id", idsInItems);
+    for (const p of catalog ?? []) namesById[p.id] = p.name;
+  }
+
   if (items.length === 0) {
     return { error: "Selecione ao menos um produto com quantidade." };
   }
@@ -135,10 +148,18 @@ export async function createOrderAction(
   revalidatePath("/", "layout");
   revalidatePath("/cozinha", "layout");
 
-  // Retorna o pedido criado para o frontend redirecionar/confirmar
+  // Retorna o pedido criado para o frontend redirecionar/confirmar,
+  // incluindo os itens (com nome) para montar a comanda de impressão.
   return {
     orderId: data?.id as string | undefined,
     orderNumber: data?.number as number | undefined,
+    items: data?.id
+      ? items.map((it) => ({
+          product_name: namesById[it.product_id] ?? "?",
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+        }))
+      : undefined,
   };
 }
 

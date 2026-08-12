@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addPaymentAction } from "@/lib/auth/cashier";
+import BackButton from "@/components/back-button";
 
 interface CashierProps {
   dayId: string;
@@ -52,9 +53,12 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
 
   return (
     <div className="space-y-5 pb-10">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Caixa</h1>
-        <p className="text-sm text-neutral-500">Dia {day}</p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Caixa</h1>
+          <p className="text-sm text-neutral-500">Dia {day}</p>
+        </div>
       </header>
 
       {closeoutError && (

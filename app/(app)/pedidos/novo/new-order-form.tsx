@@ -3,6 +3,8 @@
 import { useActionState, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createOrderAction, type CreateOrderResult } from "@/lib/auth/orders";
+import { printOrderReceipt, type PrintOrderData } from "@/lib/printing/print";
+import BackButton from "@/components/back-button";
 
 interface Product {
   id: number;
@@ -37,7 +39,8 @@ export default function NewOrderForm({
   const [paymentMethod, setPaymentMethod] = useState<"" | "dinheiro" | "pix" | "cartao">("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [acceptRetry, setAcceptRetry] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [printPreview, setPrintPreview] = useState<import("@/lib/printing/types").ReceiptPreview | null>(null);
 
   const qty = (id: number) => quantities[id] ?? 0;
   const setQty = (id: number, v: number) =>
@@ -80,9 +83,27 @@ export default function NewOrderForm({
 
   const [state, formAction, pending] = useActionState<CreateOrderResult, FormData>(async (_prev, fd) => {
     setSubmitted(true);
+    setPrintError(null);
+    setPrintPreview(null);
     const res = await createOrderAction(fd);
     if (res.orderId) {
-      router.push("/"); // volta ao dashboard (pedido criado e enviado)
+      // PEDIDO SALVO ✅ — agora a impressão (desacoplada). Se falhar, o pedido
+      // NÃO é perdido: mostra a comanda na tela e permite REIMPRIMIR.
+      const receipt: PrintOrderData = {
+        number: res.orderNumber ?? 0,
+        customer_name: customer,
+        created_at: new Date().toISOString(),
+        items: (res.items ?? []).map((it) => ({
+          product_name: it.product_name,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+        })),
+        total: total,
+      };
+      const result = await printOrderReceipt(receipt);
+      setPrintPreview(result.preview);
+      if (!result.ok) setPrintError(result.error ?? "Falha de impressão.");
+      // aguarda o usuário confirmar (modal) antes de voltar
     } else if (res.error) {
       setSubmitted(false); // permite corrigir e tentar de novo
     }
@@ -95,9 +116,12 @@ export default function NewOrderForm({
 
   return (
     <div className="space-y-5 pb-24">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Novo pedido</h1>
-        <p className="text-sm text-neutral-500">Dia de operação · {dayId.slice(0, 8)}</p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Novo pedido</h1>
+          <p className="text-sm text-neutral-500">Dia de operação · {dayId.slice(0, 8)}</p>
+        </div>
       </header>
 
       <form ref={formRef} action={formAction} className="space-y-5">
@@ -322,6 +346,63 @@ export default function NewOrderForm({
           </div>
         </div>
       </form>
+
+      {/* Confirmação do pedido + comanda (impressão DESACOPLADA) */}
+      {state?.orderId && printPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+              <p className="text-sm font-bold text-neutral-800">
+                {printError ? "⚠️ Pedido salvo, impressão falhou" : "✅ Pedido salvo · comanda"}
+              </p>
+              <span className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-bold text-white">#{state.orderNumber}</span>
+            </div>
+
+            {/* Comanda (pré-visualização) */}
+            <div className="max-h-[50vh] overflow-auto p-4">
+              <pre className="rounded-xl bg-neutral-50 p-3 font-mono text-[11px] leading-4 whitespace-pre-wrap break-words">
+                {printPreview.text}
+              </pre>
+            </div>
+
+            {printError && (
+              <p className="px-4 pb-2 text-xs font-medium text-red-700">{printError}</p>
+            )}
+
+            <div className="space-y-2 border-t border-neutral-200 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="w-full rounded-xl bg-green-600 py-3 text-center text-base font-black text-white active:bg-green-700"
+              >
+                Concluir e voltar ao início
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const receipt: PrintOrderData = {
+                    number: state.orderNumber ?? 0,
+                    customer_name: customer,
+                    created_at: new Date().toISOString(),
+                    items: (state.items ?? []).map((it) => ({
+                      product_name: it.product_name,
+                      quantity: it.quantity,
+                      unit_price: it.unit_price,
+                    })),
+                    total: total,
+                  };
+                  const result = await printOrderReceipt(receipt);
+                  if (result.ok) setPrintError(null);
+                  else setPrintError(result.error ?? "Falha de impressão.");
+                }}
+                className="w-full rounded-xl border border-neutral-300 py-3 text-center text-sm font-bold text-neutral-700 active:bg-neutral-100"
+              >
+                ♻ Reimprimir comanda
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

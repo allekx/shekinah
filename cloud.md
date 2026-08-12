@@ -291,7 +291,41 @@ DIA ENCERRADO
 
 ## 11. Impressão
 
-> Modelo da impressora e método de conexão AINDA NÃO DEFINIDOS. Não inventar informações antes da definição.
+> **REQUISITO OFICIAL (registrado em 12/08/2026, IMPLEMENTADO em 12/08/2026):**
+> Quando o John atender e criar um pedido, ao confirmar o pedido o sistema:
+> 1. salva o pedido normalmente;
+> 2. envia o pedido à Tela da Cozinha em tempo real (Realtime);
+> 3. **gera a COMANDA FÍSICA** para impressão em **impressora térmica NÃO fiscal**;
+> 4. a comanda é levada manualmente pelo John até a cozinha;
+> 5. a cozinha terá os DOIS meios (obrigatórios, não substituíveis): **tela digital** + **comanda física impressa**.
+>
+> **Formato oficial da comanda (implementado e validado):**
+> ```
+>                  SHEKINAH
+> ──────────────────────────────────────────
+>
+>                Comanda #00125
+> Cliente: João
+> ──────────────────────────────────────────
+>  1x Banda de Tambaqui             R$ 120,00
+>  2x Coca-Cola 350ml                R$ 16,00
+> ──────────────────────────────────────────
+> TOTAL                            R$ 136,00
+>
+> Data: 11/08/2026
+> Hora: 22:38
+> ```
+>
+> **IMPLEMENTAÇÃO (12/08/2026):**
+> - **`lib/printing/print.ts`** (novo): serviço `printOrderReceipt` — monta a comanda (`buildOrderReceipt`) e dispara o transporte. **Nunca lança** → devolve `{ ok, preview }`. **Desacoplado**: roda DEPOIS de o pedido ser salvo; falha de impressão NÃO perde o pedido.
+> - **`lib/printing/receipts.ts`**: comanda reformatada para o requisito oficial (Comanda #0XXXX, itens com subtotal à direita, TOTAL, Data/Hora separados). Alinhamento em colunas de 42.
+> - **`app/(app)/pedidos/novo/new-order-form.tsx`**: integrado ao fluxo — ao confirmar o pedido (RPC salva → Realtime na cozinha), monta a comanda e imprime; mostra modal "✅ Pedido salvo · comanda" com pré-visualização + **"♻ Reimprimir comanda"** + "Concluir e voltar ao início"; em falha: "⚠️ Pedido salvo, impressão falhou" (comanda exibida na tela, reimpressão disponível).
+> - **`lib/auth/orders.ts`**: `createOrderAction` retorna os `items` (com `unit_price`) além de `orderId`/`orderNumber`, para montar a comanda.
+> - **Migration `0021_order_print_log.sql` (aplicada no banco real)**: adiciona `printed_at` + `print_attempts` em `orders` (auditoria de impressão/reimpressão). Não bloqueia nada.
+>
+> **Status do transporte físico:** o método de conexão REAL (rede Wi-Fi / Web Bluetooth / USB-C) continua **por definir** (depende do modelo da impressora escolhida). O fluxo e o transporte plugável estão prontos; o default é `preview` (pré-visualização na tela). Ao escolher o modelo da impressora, implementar o transporte real em `transports.ts` (rede/web-bluetooth/usb).
+
+> Modelo da impressora e método de conexão da impressão FÍSICA AINDA NÃO DEFINIDOS. O fluxo web está implementado (comanda + preview + reimpressão). Não inventar solução de transporte não validada — ao escolher a impressora (térmica não-fiscal ESC/POS, ideal com rede), definir o transporte em `transports.ts`.
 
 **Arquitetura modular implementada** (`lib/printing/`):
 
@@ -302,6 +336,7 @@ DIA ENCERRADO
 | `escpos.ts` | Geração de **bytes ESC/POS** (INIT, alinhamento, negrito, sublinhado, latin-1) |
 | `receipts.ts` | Geradores: **comanda** (`buildOrderReceipt`), **complemento** (`buildComplementReceipt`), **relatório** (`buildCloseoutReceipt`) |
 | `transports.ts` | Transportes plugáveis: **preview (default)**, bluetooth, webusb, network, console (brancos/stubs documentados) |
+| **`print.ts`** | **Serviço de alto nível** `printOrderReceipt`: monta a comanda + dispara o transporte. Desacoplado (nunca bloqueia o pedido) e nunca lança (sempre `{ ok, preview }`). |
 
 **Documentos preparados** (formato do requisito):
 - **Comanda**: SHEKINAH / PEDIDO #XXX / CLIENTE / itens (2x ...) / TOTAL / DATA-HORA.
@@ -323,7 +358,7 @@ DIA ENCERRADO
    - Causa: helpers eram `SECURITY INVOKER` → recursão com a política de `profiles`.
    - Solução: tornar os helpers `SECURITY DEFINER` com `set search_path=''` e referências qualificadas (quebra a recursão, sem escalar privilégio — consultam apenas o próprio papel).
    - Status: **resolvido** — correção aplicada no banco e nas migrations 0002/0005; RLS revalidado.
-2. **`business_days.day` é UNIQUE**: não é possível abrir mais de um dia de operação para a mesma data (o dia fechado de hoje bloqueia reabrir hoje). Foi tratado como *desenho aprovado*, mas **tornou-se o problema de produção de 12/08/2026** (não era possível iniciar um novo dia após o fechamento). **Correção preparada** na migration `0020` (remover `UNIQUE(day)`; `business_days_one_open_idx` segue garantindo no máximo 1 dia aberto). **Aguardando autorização para aplicar.**
+2. **`business_days.day` é UNIQUE (RESOLVIDO)**: não era possível abrir um segundo dia na mesma data. Tornou-se o **problema de produção de 12/08/2026** (não se conseguia iniciar novo dia após o fechamento). **Correção aplicada (migration `0020`, 12/08/2026)**: removido `UNIQUE(day)`; `business_days_one_open_idx` garante no máximo 1 dia aberto. Verificado no banco real (índice removido, dados intactos).**
 3. **Papel por prefixo de e-mail**: acoplamento simples; se John quiser papel manual, criar RPC de gestão de usuário.
 4. **Teste de anti-corrida concorrente não executado**: o teste real de duas conexões simultâneas da última unidade não pôde ser rodado. A mecânica (locks `FOR UPDATE`) está implementada e o bloqueio de estoque insuficiente foi validado; o teste concorrente fica como pendência.
 5. **Login falha para usuários criados via SQL direto**: usuários inseridos fora do painel (INSERT em `auth.users`) geram "Database error querying schema" no GoTrue. Causa: faltam identity/metadados no formato exato do GoTrue. Solução: criar usuários **sempre pelo painel/Admin API**. Os usuários de teste criados via SQL foram removidos.
@@ -448,6 +483,13 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **SIGNUP PÚBLICO DESATIVADO (12/08/2026)**: usuário desativou "Allow new users to sign up" no painel Supabase — brecha de segurança da auditoria fechada.
 - **DEPLOY NO VERCEL REALIZADO (12/08/2026)**: usuário fez deploy via repositório GitHub. Sistema publicado em URL `*.vercel.app`. **Importante**: verificar as variáveis de ambiente no Vercel (NEXT_PUBLIC_SUPABASE_URL + ANON_KEY) — são obrigatórias e não vão para o repositório.
 
+### 12/08/2026 (fim de tarde) — REQUISITO OFICIAL: IMPRESSÃO DA COMANDA FÍSICA
+
+- **Requisito registrado (aguardando implementação)**: ao criar um pedido, além de salvar e enviar à cozinha (Realtime, já funciona), o sistema deve gerar a **comanda física** para impressora térmica **não fiscal**. A cozinha terá os **dois meios obrigatórios** (tela digital + comanda física). Ver seção 11.
+- **Análise técnica concluída (12/08/2026)**: método mais adequado = **rede Wi-Fi (HTTP/TCP ESC/POS)**, 100% web e multiplataforma; alternativa Android-only = **Web Bluetooth**; USB-C/OTG via WebUSB é frágil (app nativo é mais robusto). Impressão **desacoplada** da criação do pedido (falha de impressão NÃO perde o pedido; opção de reimprimir). Modelo indicado: térmica não-fiscal 58/80mm compatível com ESC/POS, ideal com rede. **Aguardando autorização para implementar.**
+- **IMPLEMENTAÇÃO CONCLUÍDA (12/08/2026)**: comanda integrada ao fluxo de novo pedido (seção 11). `lib/printing/print.ts` (serviço desacoplado), comanda reformatada ao requisito oficial, integração no `new-order-form` (modal de confirmação + reimpressão), `createOrderAction` retorna itens com preço, migration `0021` (printed_at/print_attempts) aplicada no banco real. **Transporte físico ainda por definir** (depende da impressora escolhida) — default `preview`. Build OK.
+- **Mudanças de código relacionadas nesta data**: botões de voltar adicionados às telas secundárias (`components/back-button.tsx` + 10 telas), fix de UX no `mapOpenDayError` (abrir dia na mesma data), type-check e build OK. NÃO deployado — usuário fará deploy manual pelo terminal.
+
 ### 12/08/2026 (tarde) — PROBLEMA DE PRODUÇÃO: NÃO CONSEGUE INICIAR UM NOVO DIA
 
 **Investigação concluída — causa raiz identificada. Correção PREPARADA localmente, NÃO aplicada ainda.**
@@ -476,39 +518,46 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 
 ```
 ESTADO ATUAL DO PROJETO:
-Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0019,
+Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0021,
 11 tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída (regras críticas validadas + correções sem
 custo). BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅ (fluxo/permissões/robustez/mobile).
 REVISÃO TÉCNICA (12/08/2026) CONCLUÍDA E VALIDADA: correções de código (cancelar pedido, troco,
 pending no caixa, destaque de novo na cozinha, ESC/POS) + migrations 0018/0019 aplicadas e VALIDADAS
-no banco real (10/10: troco em dinheiro, pronto+pago=entregue, cancel_order, RLS inativos). Neste
-momento: dia 2026-08-11 ABERTO com 3 pedidos de teste da validação.
+no banco real (10/10: troco em dinheiro, pronto+pago=entregue, cancel_order, RLS inativos).
+MIGRATION 0020 APLICADA no banco real (12/08/2026): removido UNIQUE(day) em business_days — permite
+reabrir o mesmo dia após fechamento (one_open_idx mantém 1 dia aberto). Verificado (índice removido,
+dados intactos).
+MIGRATION 0021 APLICADA no banco real (12/08/2026): printed_at + print_attempts em orders (auditoria
+de impressão da comanda). Verificado (colunas criadas).
+REQUISITO OFICIAL DE IMPRESSÃO IMPLEMENTADO (12/08/2026): comanda física térmica NÃO fiscal ao criar
+pedido (obrigatória junto com a tela da cozinha), desacoplada (falha não perde o pedido), com
+reimpressão e auditoria. Transporte físico real depende da impressora a escolher (default preview).
+Botões de voltar adicionados às telas secundárias. Ver seção 11.
+Dia atual no banco: 2026-08-11 FECHADO (sem dia aberto).
 
 ÚLTIMA ETAPA CONCLUÍDA:
 Revisão técnica completa validada: correções LOCAIS (build OK) + migrations 0018/0019 validadas no
-banco real (10/10 testes).
+banco real (10/10 testes) + migration 0020 aplicada e verificada (reabrir mesmo dia).
 
 PRÓXIMA ETAPA:
 1) ✅ **Signup público DESATIVADO** no painel Supabase (usuário confirmou em 12/08/2026) — brecha da auditoria fechada.
-2) ✅ **Deploy no Vercel realizado pelo usuário** (via repositório GitHub) — 12/08/2026. Sistema no ar em URL `*.vercel.app`.
+2) ✅ **Deploy no Vercel realizado pelo usuário** (via repositório GitHub) — 12/08/2026. Sistema no ar em URL `*.vercel.app`. **Deploy manual da última alteração (botões voltar + fix UX) pendente — usuário fará pelo terminal.**
 3) **Verificar variáveis de ambiente no Vercel** (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) — são obrigatórias e não são commitadas (`.env.local` fica fora do repositório). Sem elas o app não conecta ao Supabase.
-4) Quando o modelo da impressora for escolhido: implementar o transporte real (bluetooth/usb/rede).
-5) Operação real: abrir um novo dia.
-6) Teste de anti-corrida concorrente real (pendente).
+4) ✅ **Migration 0020 APLICADA** (reabrir mesmo dia) — 12/08/2026.
+5) ✅ **REQUISITO OFICIAL IMPRESSÃO IMPLEMENTADO (12/08/2026)** — comanda física integrada ao fluxo de novo pedido (desacoplada — falha de impressão não perde pedido; modal de confirmação + reimpressão). Migration `0021` (printed_at/print_attempts) aplicada no banco. **Pendente apenas o transporte físico REAL (rede/web-bluetooth/usb) — depende do modelo da impressora a escolher; default é preview.** Ver seção 11.
+6) Operação real: abrir um novo dia.
+7) Teste de anti-corrida concorrente real (pendente).
 
 PROBLEMAS PENDENTES:
 - Confirmar que as variáveis de ambiente estão configuradas no Vercel (URL + anon key).
-- Modelo/método da impressora INDEFINIDO — transportes reais são stubs até escolher o modelo.
-- Há um dia ABERTO (2026-08-11) com pedidos de teste da validação — pode ser limpo ao iniciar operação real.
+- Modelo/método da impressora INDEFINIDO — **fluxo de impressão web IMPLEMENTADO (comanda + preview + reimpressão); o TRANSPORTE físico real continua por definir até escolher o modelo da impressora (ver seção 11).**
+- Há um dia FECHADO (2026-08-11) com pedidos de teste — pode ser limpo ao iniciar operação real.
 - Teste de anti-corrida concorrente real (pendente).
-- Teste de anti-corrida concorrente (duas conexões simultâneas) ainda não executado.
-- Modelo/método da impressora INDEFINIDO — transportes reais são stubs até escolher o modelo.
 - Seed de produtos é exemplo; ajustar com o atendimento (John).
 - Usuários devem ser criados SEMPRE pelo painel (via SQL dá erro de login no GoTrue).
-- `business_days.day` único por data — **CAUSA RAIZ do problema de produção (12/08/2026)**: após fechar o dia na mesma data do fuso do estabelecimento (America/Manaus), não é possível abrir novo dia (viola `business_days_day_key`). **Correção preparada localmente na migration `0020` (remover UNIQUE(day); `one_open_idx` mantém 1 aberto). PENDENTE de autorização para aplicar.**
+- `business_days.day` único por data — **RESOLVIDO (12/08/2026)**: migration 0020 removeu o UNIQUE(day); agora é possível reabrir o mesmo dia após fechamento (one_open_idx mantém 1 aberto). Aplicado e verificado no banco real.
 - Todos os dados atuais (pedidos/dia) são de TESTE — na operação real será aberto um novo dia.
 - Dependência `sharp` é devOnly (usada apenas para gerar ícones) — não afeta produção/custo.
-- **`business_days.day` único por data impedindo reabrir — migration 0020 PREPARADA localmente (NAO aplicada)**. Aguardando autorização do usuário para `supabase db push`.
 ```
 
 ---

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { buildCloseoutReceipt } from "@/lib/printing/receipts";
 import { PrintPreviewButton } from "@/components/print/print-preview-modal";
+import BackButton from "@/components/back-button";
 import type { ReceiptPreview } from "@/lib/printing/types";
 
 interface Props {
@@ -75,11 +76,14 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-bold text-neutral-900">Relatório do dia</h1>
-        <p className="text-sm text-neutral-500">
-          {new Date(day.day + "T00:00:00").toLocaleDateString("pt-BR")} · somente leitura
-        </p>
+      <header className="flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-xl font-bold text-neutral-900">Relatório do dia</h1>
+          <p className="text-sm text-neutral-500">
+            {new Date(day.day + "T00:00:00").toLocaleDateString("pt-BR")} · somente leitura
+          </p>
+        </div>
       </header>
 
       {closeoutError && (
