@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import PageShell from "@/components/page-shell";
+import { SkNavLink } from "@/components/navigation-pending";
 import { closeDay } from "@/lib/auth/close-day";
 import { formatMoneyInput, parseMoney } from "@/lib/money";
 
@@ -101,9 +102,13 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
           </section>
         )}
 
-        <a href={`/relatorio/${day.id}`} className="sk-btn-primary block w-full py-4 text-center text-lg">
+        <SkNavLink
+          href={`/relatorio/${day.id}`}
+          skeleton="report"
+          className="sk-btn-primary block w-full py-4 text-center text-lg"
+        >
           Ver relatório
-        </a>
+        </SkNavLink>
         <p className="text-center text-xs sk-text-muted">
           O dia foi bloqueado e o histórico está preservado.
         </p>

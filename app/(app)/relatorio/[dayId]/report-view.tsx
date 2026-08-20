@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import PageShell from "@/components/page-shell";
 import PrintReceiptButton from "@/components/print/print-receipt-button";
+import { SkNavLink } from "@/components/navigation-pending";
 import { getPrinterSettings } from "@/lib/auth/printer-settings";
 import { printCloseoutReceipt } from "@/lib/printing/print";
 import { toPrintSettings } from "@/lib/printing/settings";
@@ -157,12 +158,9 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
             }}
           />
         )}
-        <a
-          href="/"
-          className="sk-btn-secondary block w-full py-3.5 text-center"
-        >
+        <SkNavLink href="/" skeleton="home" className="sk-btn-secondary block w-full py-3.5 text-center">
           Voltar ao início
-        </a>
+        </SkNavLink>
         {day.status === "fechado" && (
           <p className="text-center text-xs sk-text-muted">
             Na tela inicial você pode iniciar um novo dia de operação.

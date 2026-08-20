@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useNavigationPending } from "@/components/navigation-pending";
 
 /** Botão "voltar" móvel-first.
  *  Usa o histórico do navegador (router.back()) para retornar à tela anterior.
@@ -8,13 +9,19 @@ import { useRouter } from "next/navigation";
  */
 export default function BackButton() {
   const router = useRouter();
+  const { startPending, isNavigating } = useNavigationPending();
 
   return (
     <button
       type="button"
-      onClick={() => router.back()}
+      onClick={() => {
+        if (isNavigating) return;
+        startPending("generic-list");
+        router.back();
+      }}
+      disabled={isNavigating}
       aria-label="Voltar"
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-600 shadow-sm transition hover:border-neutral-300 hover:text-neutral-900 active:translate-y-px active:bg-neutral-50"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-600 shadow-sm transition hover:border-neutral-300 hover:text-neutral-900 active:translate-y-px active:bg-neutral-50 disabled:opacity-60"
     >
       <svg
         width="20"

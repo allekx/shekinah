@@ -3,6 +3,7 @@ import { createClient, getRole } from "@/lib/supabase/server";
 import { getTimeGreeting } from "@/lib/greeting";
 import { redirect } from "next/navigation";
 import HomeDashboard from "./home-dashboard";
+import StartDayLink from "@/components/start-day-link";
 
 /** Dashboard principal do John (mobile-first).
  *  - Sem dia aberto → 🌅 INICIAR DIA.
@@ -112,12 +113,7 @@ export default async function HomePage() {
             Informe o estoque inicial e o caixa para abrir o dia de operação.
           </p>
 
-          <a
-            href="/abrir-dia"
-            className="flex h-14 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-primary-500 to-primary-700 text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-600/25 transition hover:from-primary-600 hover:to-primary-800 active:scale-[0.99]"
-          >
-            Iniciar dia
-          </a>
+          <StartDayLink />
 
           <p className="mt-auto pt-10 text-center text-xs text-neutral-400">
             Acesso restrito

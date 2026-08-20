@@ -127,3 +127,49 @@ export function CashierSkeleton() {
     </div>
   );
 }
+
+export function GenericListSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="space-y-5">
+      <PageHeaderSkeleton />
+      <div className="space-y-3">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="sk-card flex items-center justify-between gap-3 p-4">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Bone className="h-4 w-40 max-w-[12rem] rounded" />
+              <Bone className="h-3 w-24 rounded" />
+            </div>
+            <Bone className="h-8 w-16 shrink-0 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ReportSkeleton() {
+  return (
+    <div className="space-y-5">
+      <PageHeaderSkeleton />
+      <div className="sk-card space-y-3 p-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between py-1">
+            <Bone className="h-4 w-36 rounded" />
+            <Bone className="h-4 w-20 rounded" />
+          </div>
+        ))}
+      </div>
+      <Bone className="h-12 w-full rounded-2xl" />
+    </div>
+  );
+}
+
+export function OpenDaySkeleton() {
+  return (
+    <div className="space-y-5">
+      <PageHeaderSkeleton />
+      <ProductListSkeleton rows={8} />
+      <Bone className="h-14 w-full rounded-2xl" />
+    </div>
+  );
+}

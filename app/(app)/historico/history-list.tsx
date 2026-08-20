@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import PageShell from "@/components/page-shell";
+import { SkNavLink } from "@/components/navigation-pending";
 
 interface HistoryDay {
   id: string;
@@ -30,8 +31,9 @@ export default function HistoryList({ days }: { days: HistoryDay[] }) {
           const date = new Date(d.day + "T00:00:00");
           return (
             <li key={d.id}>
-              <a
+              <SkNavLink
                 href={`/relatorio/${d.id}`}
+                skeleton="report"
                 className="sk-card sk-card--interactive block p-4"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -55,7 +57,7 @@ export default function HistoryList({ days }: { days: HistoryDay[] }) {
                       : `Diferença de ${fmtBRL(Math.abs(Number(d.cash_difference ?? 0)))}`}
                   </p>
                 )}
-              </a>
+              </SkNavLink>
             </li>
           );
         })}

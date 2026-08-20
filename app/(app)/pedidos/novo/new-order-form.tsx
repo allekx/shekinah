@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import PageShell from "@/components/page-shell";
+import { useSkNavigate } from "@/components/navigation-pending";
 import { createOrderAction, type CreateOrderResult } from "@/lib/auth/orders";
 import { printOrderReceipt, type PrintOrderData } from "@/lib/printing/print";
 import {
@@ -30,7 +30,7 @@ export default function NewOrderForm({
   products: CatalogProduct[];
   printerSettings: PrinterConfig;
 }) {
-  const router = useRouter();
+  const navigate = useSkNavigate();
   const formRef = useRef<HTMLFormElement>(null);
   const printSettings = useMemo(() => toPrintSettings(printerSettings), [printerSettings]);
   const productMap = useMemo(() => buildProductMap(products), [products]);
@@ -313,7 +313,7 @@ export default function NewOrderForm({
             <div className="space-y-2 border-t border-neutral-200 px-4 py-3">
               <button
                 type="button"
-                onClick={() => router.push("/")}
+                onClick={() => navigate("/", "home")}
                 className="sk-btn-success w-full py-3 text-base"
               >
                 Concluir e voltar ao início

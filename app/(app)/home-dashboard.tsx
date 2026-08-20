@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SkNavLink } from "@/components/navigation-pending";
 import { createClient } from "@/lib/supabase/client";
 
 interface LowStockItem {
@@ -151,12 +152,13 @@ export default function HomeDashboard({
         </div>
       </section>
 
-      <a
+      <SkNavLink
         href="/pedidos/novo"
+        skeleton="new-order"
         className="flex h-14 items-center justify-center rounded-2xl bg-gradient-to-r from-primary-500 to-primary-600 text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-500/25 transition hover:from-primary-600 hover:to-primary-700 active:scale-[0.99]"
       >
         ＋ Novo pedido
-      </a>
+      </SkNavLink>
 
       <section className="sk-card overflow-hidden p-0">
         <div className="border-b border-neutral-100 px-4 py-3">
@@ -200,26 +202,26 @@ export default function HomeDashboard({
             { href: "/estoque", label: "Estoque", icon: "📦" },
             { href: "/usuarios", label: "Usuários", icon: "👤" },
           ].map((a) => (
-            <a
+            <SkNavLink
               key={a.href}
               href={a.href}
               className="flex flex-col items-center justify-center gap-2 rounded-2xl border p-5 text-center transition active:scale-[.98] sk-card sk-card--interactive border-neutral-200/80 text-neutral-800"
             >
               <span className="text-xl leading-none">{a.icon}</span>
               <span className="text-sm font-bold">{a.label}</span>
-            </a>
+            </SkNavLink>
           ))}
         </div>
       </section>
 
       <p className="text-center text-xs text-neutral-400">
-        <a href="/relatorio" className="font-semibold text-primary-600">
+        <SkNavLink href="/relatorio" skeleton="report" className="font-semibold text-primary-600">
           Histórico e relatórios
-        </a>
+        </SkNavLink>
         {" · "}
-        <a href="/impressora" className="font-semibold text-primary-600">
+        <SkNavLink href="/impressora" className="font-semibold text-primary-600">
           Impressora
-        </a>
+        </SkNavLink>
       </p>
     </div>
   );

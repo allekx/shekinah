@@ -1,5 +1,6 @@
 import { getUser, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import AppMainShell from "@/components/app-main-shell";
 import SessionHeader from "./session-header";
 
 /** Layout do app autenticado. Protege a área e monta o shell mobile.
@@ -28,7 +29,9 @@ export default async function AppLayout({
         email={user.email ?? ""}
         role={role}
       />
-      <main className="sk-app-main">{children}</main>
+      <main className="sk-app-main">
+        <AppMainShell>{children}</AppMainShell>
+      </main>
     </div>
   );
 }
