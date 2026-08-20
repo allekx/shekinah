@@ -79,9 +79,11 @@ export class NetworkTransport implements PrinterTransport {
       throw new Error("Configure a URL da impressora em Impressora.");
     }
 
+    const body = Uint8Array.from(data);
+
     const response = await fetch(url, {
       method: "POST",
-      body: data,
+      body,
       headers: { "Content-Type": "application/octet-stream" },
     });
 

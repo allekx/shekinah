@@ -48,7 +48,12 @@ SHEKINAH/
 │  ├─ (auth)/login/page.tsx    # Login mobile-first — hero laranja + card flutuante (sem cadastro público)
 │  ├─ (app)/layout.tsx         # Shell autenticado (header + sessão + logout)
 │  ├─ (app)/session-header.tsx # Cabeçalho de sessão (marca + perfil + botão sair)
-│  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA (visual alinhado ao login)
+│  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA
+│  ├─ (app)/home-dashboard.tsx # Client: métricas ao vivo (Realtime orders) + grid Ações
+│  ├─ (app)/usuarios/          # Gestão de usuários (john) — criar, e-mail, papel, senha
+│  │  ├─ page.tsx              #   server: lista profiles
+│  │  ├─ user-form.tsx         #   client: criar usuário (cozinha/atendimento)
+│  │  └─ user-list.tsx         #   client: editar e-mail, papel, redefinir senha
 │  ├─ (app)/abrir-dia/         # Abertura do dia
 │  │  ├─ page.tsx              #   server: carrega produtos, redireciona se dia aberto
 │  │  ├─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar
@@ -94,6 +99,9 @@ SHEKINAH/
 │  ├─ auth/kitchen.ts          # Server action: updateStatusAction (cozinha)
 │  ├─ auth/cashier.ts          # Server action: addPaymentAction (caixa)
 │  ├─ auth/close-day.ts        # Server action: closeDay (fechamento)
+│  ├─ auth/users.ts            # Server actions: gestão de usuários (Admin API server-side)
+│  ├─ supabase/admin.ts        # Cliente service_role — SOMENTE servidor (criar/redefinir senha/e-mail)
+│  ├─ greeting.ts                # Saudação dinâmica (Bom dia/tarde/noite, fuso America/Sao_Paulo)
 │  └─ printing/                # Camada modular de impressão
 │     ├─ types.ts              #   interfaces ReceiptBuilder/PrinterTransport
 │     ├─ text-builder.ts       #   formatador de texto (largura em colunas)
@@ -101,6 +109,7 @@ SHEKINAH/
 │     ├─ receipts.ts           #   comanda, complemento, relatório de fechamento
 │     └─ transports.ts         #   transportes plugáveis (preview default + stubs)
 ├─ components/
+│  ├─ page-shell.tsx              # Cabeçalho padrão das páginas internas (BackButton + título)
 │  ├─ brand-mark-icon.tsx         # Ícone da marca (sítio + cozinha + pedido)
 │  ├─ brand-wordmark.tsx          # Marca Shekinah (ícone + logotipo tipográfico)
 │  ├─ print/
@@ -113,8 +122,8 @@ SHEKINAH/
 │  ├─ icon.svg + icon-192/512/maskable.png + apple-touch-icon.png
 ├─ scripts/generate-icons.mjs     # Gera os ícones PNG via sharp (node scripts/generate-icons.mjs)
 ├─ middleware.ts               # Sessão + proteção de rotas + guarda por perfil + assets públicos PWA
-├─ .env.local                  # URL + anon key (NUNCA service_role)
-├─ .env.example
+├─ .env.local                  # URL + anon key + SUPABASE_SERVICE_ROLE_KEY (secret, só servidor)
+├─ .env.example                # Template (inclui placeholder da service_role / Secret key)
 ├─ scripts/test-auth.mjs       # Teste de autenticação (anon key + RLS)
 └─ supabase/
 │  ├─ config.toml              # Configuração do Supabase CLI (sem credenciais)
@@ -208,9 +217,15 @@ SHEKINAH/
 - **Atendimento** (papel `john`) — o papel `john` representa o atendimento/gerência: iniciar/fechar dia, caixa, pedidos, relatórios, configurações. Usuário real: `atendimento@shekinah.com`.
 - **Cozinha** (papel `cozinha`) — somente cozinha. Usuário real: `cozinha@shekinah.com`.
 
-Criação de usuários: no painel Supabase (Auth → Users → Add user). O trigger `handle_new_user` define o papel por prefixo de e-mail (`john@*` → john; demais → cozinha). Para papel diferente do padrão, ajustar o `profiles.role` via SQL.
+Criação de usuários:
 
-> NOTA IMPORTANTE: usuários criados **fora do painel** (ex.: via INSERT direto em `auth.users`) não são reconhecidos pelo GoTrue no login ("Database error querying schema"). Usuários devem ser criados **sempre pelo painel/Admin API** (gera identity/confirmed_at corretos).
+- **Pelo app** (recomendado): tela `/usuarios` (somente john) — criar usuário cozinha ou atendimento, alterar e-mail, trocar papel, redefinir senha. Usa **Supabase Admin API** via `SUPABASE_SERVICE_ROLE_KEY` em Server Actions (`lib/auth/users.ts` + `lib/supabase/admin.ts`). A chave **nunca** vai ao frontend (sem prefixo `NEXT_PUBLIC_`).
+- **Pelo painel Supabase** (alternativa): Auth → Users → Add user, ou Secret keys no dashboard.
+- O trigger `handle_new_user` define papel por prefixo de e-mail (`john@*` → john; demais → cozinha). O app **sobrescreve** o papel após criar via Admin API (corrige e-mails como `atendimento@...`).
+
+**Múltiplos atendentes simultâneos:** um único dia aberto compartilhado (estoque, pedidos, caixa). Locks no Postgres (`FOR UPDATE` em `create_order`, pagamentos) evitam corrida. Cozinha recebe pedidos de todos via Realtime. Relatório/fechamento consolida **todo o dia** (não separa por atendente; `payments.created_by` fica no banco para auditoria futura).
+
+> NOTA IMPORTANTE: usuários criados **fora do painel/Admin API** (ex.: via INSERT direto em `auth.users`) não são reconhecidos pelo GoTrue no login ("Database error querying schema"). Usuários devem ser criados **sempre pelo painel ou Admin API** (gera identity/confirmed_at corretos).
 
 ## 8. Funcionalidades
 
@@ -229,8 +244,9 @@ Criação de usuários: no painel Supabase (Auth → Users → Add user). O trig
 - [x] Fechamento do dia (tela /fechamento) — conferência (vendas/caixa/estoque), confirmar, bloqueia dia, DIA ENCERRADO + IMPRIMIR RELATÓRIO
 - [x] Impressão (arquitetura modular) — camada lib/printing + preview; formatos comanda/complemento/relatório prontos; transportes plugáveis (método a definir)
 - [x] Histórico e Relatórios — /historico (dias encerrados) e /relatorio/[dayId] (detalhes + imprimir relatório)
-- [x] Dashboard principal do John (home /) — sem dia → INICIAR DIA (hero + card); com dia → DIA EM ANDAMENTO (pedidos/vendas/preparo/prontos/estoque baixo) + ações (NOVO PEDIDO em destaque)
-- [x] Identidade visual (login + header + app) — ícone sítio/restaurante, logotipo SHEKINAH, paleta laranja `#FF8A4F` / `#FFC176` via tokens `primary-*` em `globals.css`
+- [x] Dashboard principal do John (home /) — sem dia → INICIAR DIA; com dia → métricas ao vivo (Realtime) + saudação dinâmica + grid Ações (Pedidos, Caixa, Estoque, **Usuários**)
+- [x] Gestão de usuários (/usuarios) — criar cozinha/atendimento, alterar e-mail, trocar papel, redefinir senha (john + Admin API server-side)
+- [x] Identidade visual unificada (design system `sk-*` em globals.css) — mobile-first, padding lateral consistente, PageShell nas telas internas
 - [x] PWA (Android) — manifest, ícones (192/512/maskable/apple), service worker manual, viewport, banner de conexão, anti-duplicação verificada
 
 Legenda: `[x]` concluído · `[~]` parcialmente implementado · `[ ]` ainda não implementado
@@ -276,7 +292,9 @@ DIA ENCERRADO
 - Foi decidido que **toda regra de negócio crítica roda no banco** (RPCs transacionais), sem camada de API própria.
 - Foi decidido que **gravações de negócio** (pedidos, estoque, pagamentos, dias) **só via RPC**; catálogo (products) e settings editáveis por John via RLS.
 - Foi decidido que **pagamento pode ser dividido** em múltiplas formas (dinheiro/pix/cartão), com troco modelado (change_given).
-- Foi decidido que **estoque é controlado por dia** (`initial_qty - sold_qty`), não armazenado como saldo.
+- Foi decidido que **estoque é controlado por dia** (`initial_qty - sold_qty`), não armazenado como saldo global.
+- Foi decidido que **dados de dias encerrados são preservados** no banco (histórico completo); fechamento só marca `status=fechado` e grava conferência — impressão do relatório não apaga nada.
+- Foi decidido que **gestão de usuários no app** usa `service_role` apenas em Server Actions (variável `SUPABASE_SERVICE_ROLE_KEY`), nunca no bundle client.
 - Foi decidido que **preço é snapshot** no item do pedido.
 - Foi decidido que **cancelação só de pedido não pago** (estorno/reembolso fora do escopo atual).
 - Foi decidido que **papel do usuário é definido pelo prefixo do e-mail** (john@ → john).
@@ -482,7 +500,7 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
   - **Impressão**: `DOUBLE_H_ON` corrigido para `GS ! n` (era comando errado `ESC d`).
 - **VALIDAÇÃO DAS CORREÇÕES (banco real) CONCLUÍDA (12/08/2026)**: após autorização do usuário, o dia de teste foi removido e um dia novo aberto. **10/10 testes passaram**: dinheiro com TROCO (entrega R$200 → troco R$80, líquido = total, `paid=true`); **pronto + pago → ENTREGUE automático** + histórico `pronto→entregue`; `cancel_order` (status cancelado, estoque restaurado, cancelar pago bloqueado); RLS products **john vê inativos** (reativar). A revisão técnica está **concluída e validada**.
 - **SIGNUP PÚBLICO DESATIVADO (12/08/2026)**: usuário desativou "Allow new users to sign up" no painel Supabase — brecha de segurança da auditoria fechada.
-- **DEPLOY NO VERCEL REALIZADO (12/08/2026)**: usuário fez deploy via repositório GitHub. Sistema publicado em URL `*.vercel.app`. **Importante**: verificar as variáveis de ambiente no Vercel (NEXT_PUBLIC_SUPABASE_URL + ANON_KEY) — são obrigatórias e não vão para o repositório.
+- **DEPLOY NO VERCEL REALIZADO (12/08/2026)**: usuário fez deploy via repositório GitHub. Sistema publicado em URL `*.vercel.app`. **Importante**: variáveis no Vercel — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e (desde 19/08/2026) `SUPABASE_SERVICE_ROLE_KEY` para gestão de usuários em `/usuarios`.
 
 ### 12/08/2026 (fim de tarde) — REQUISITO OFICIAL: IMPRESSÃO DA COMANDA FÍSICA
 
@@ -556,42 +574,64 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **PWA**: `theme_color` / `themeColor` → `#FF8A4F`; `public/icon.svg` atualizado (PNG precisa regerar com `node scripts/generate-icons.mjs` se desejado).
 - Build OK. **NÃO commitado/deployado ainda.**
 
+### 19/08/2026 (noite, sessão 2) — DESIGN SYSTEM, USUÁRIOS, CORREÇÕES UX + REALTIME
+
+**Identidade visual / layout (somente UI):**
+- Design system `sk-*` em `globals.css` (`sk-app-shell`, `sk-app-main`, `sk-card`, `sk-btn-*`, `sk-input`, etc.) aplicado nas telas internas via `PageShell`.
+- **Padding lateral** explícito em `sk-app-main` (corrigido: `composes` não funciona em CSS global Tailwind v4).
+- Login: inputs com ícones (`sk-input-soft`), texto "Acesso restrito · usuários são criados pelo administrador" **removido**.
+- Home: saudação dinâmica (`lib/greeting.ts`, fuso `America/Sao_Paulo`); `home-dashboard.tsx` com Realtime (métricas + estoque baixo).
+- Grid **Ações** na home: Pedidos, Caixa, Estoque, **Usuários**.
+- Rodapé fixo novo pedido: `sk-page-with-sticky-footer` (botão não cobre o total).
+- Caixa: botões "Registrar pagamento" padronizados; encerrar dia com caixa esperado R$ 0 (só Pix) corrigido.
+
+**Gestão de usuários (`/usuarios`):**
+- `lib/supabase/admin.ts` + `lib/auth/users.ts` — criar usuário, alterar e-mail, trocar papel (cozinha/atendimento), redefinir senha.
+- Requer `SUPABASE_SERVICE_ROLE_KEY` no `.env.local` (Secret key do Supabase, **sem** `NEXT_PUBLIC_`). Documentado em `.env.example`.
+- Segurança: `"use server"`, `assertJohn()` antes de Admin API; signup público desativado no Supabase.
+
+**Operação multi-atendente:** dia/estoque/caixa únicos compartilhados; locks anti-corrida no banco; cozinha e relatório consolidam todo o dia.
+
+**Dados após fechamento:** tudo permanece no Postgres (histórico `/historico`, relatório `/relatorio/[dayId]`); impressão não apaga registros.
+
+Build OK local. **NÃO commitado/deployado ainda.**
+
 ## 15. Estado atual
 
 ```
 ESTADO ATUAL DO PROJETO:
-Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0021,
-11 tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída. BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅.
+Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0025+,
+11+ tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída. BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅.
 Funcionalidades operacionais completas (abertura → fechamento). Impressão web (preview + comanda/complemento) OK;
 transporte físico da impressora ainda por definir.
 
-ALTERAÇÕES LOCAIS RECENTES (19/08/2026 — NÃO commitadas/deployadas):
-- /abrir-dia: cadastro de produto antes de iniciar o dia (Pratos → Bebidas → novo produto → caixa).
-- Seletor de categoria customizado no cadastro de produto (mobile).
-- Redesign visual login/marca/home + **paleta laranja global** (`primary-*` = #FF8A4F / #FFC176).
-- Alterações visuais em várias telas do git status (cozinha, pedidos, produtos, globals.css) — revisão/deploy pendente.
+ALTERAÇÕES LOCAIS RECENTES (19/08/2026 sessão 2 — NÃO commitadas/deployadas):
+- Design system `sk-*` + padding lateral + PageShell em todas as telas internas.
+- Home com Realtime (`home-dashboard.tsx`), saudação dinâmica, grid Ações inclui Usuários.
+- Gestão de usuários `/usuarios` (criar, e-mail, papel, senha) via Admin API server-side.
+- `.env.example` atualizado com `SUPABASE_SERVICE_ROLE_KEY`.
+- Correções UX: login, rodapé novo pedido, caixa (Pix-only), Realtime home/pedidos.
+- Login: removido aviso "Acesso restrito · usuários criados pelo administrador".
 
 ÚLTIMA ETAPA CONCLUÍDA:
-Cadastro de produto em /abrir-dia + redesign visual + **paleta laranja global no design system** — build OK local.
+Design system unificado + gestão de usuários no app + correções de UX/Realtime — build OK local.
 
 PRÓXIMA ETAPA:
-1) Commit + deploy manual das alterações locais (usuário fará pelo terminal).
-2) Regerar ícones PNG do PWA (`node scripts/generate-icons.mjs`) se quiser ícone laranja no celular.
-3) Verificar variáveis de ambiente no Vercel (URL + anon key).
+1) Configurar `SUPABASE_SERVICE_ROLE_KEY` no Vercel (Production) para gestão de usuários em produção.
+2) Commit + deploy manual das alterações locais (usuário fará pelo terminal).
+3) Regerar ícones PNG do PWA (`node scripts/generate-icons.mjs`) se quiser ícone laranja no celular.
 4) Transporte físico REAL da impressora (rede/web-bluetooth/usb) — depende do modelo escolhido.
-5) Operação real: abrir um novo dia com catálogo/estoque definitivos.
-6) Teste de anti-corrida concorrente real (pendente).
+5) Operação real com múltiplos atendentes (validar fluxo completo).
 
 PROBLEMAS PENDENTES:
-- Alterações locais (19/08/2026) **NÃO commitadas/deployadas**.
-- Ícones PNG do PWA (`icon-192/512`) ainda podem estar na cor azul antiga — regerar via `scripts/generate-icons.mjs` após validar `icon.svg`.
+- Alterações locais **NÃO commitadas/deployadas**.
+- `SUPABASE_SERVICE_ROLE_KEY` obrigatória localmente e no Vercel para criar/redefinir usuários pelo app.
+- Tela `/estoque` sem Realtime (recarregar para ver ajuste de outro atendente).
+- Relatório não detalha vendas por atendente (dado `payments.created_by` existe no banco).
+- Ícones PNG do PWA podem estar na cor azul antiga — regerar via `scripts/generate-icons.mjs`.
 - Modelo/método da impressora INDEFINIDO (fluxo web OK; transporte real por definir — seção 11).
-- PERFORMANCE: otimizações 1 e 3 (auth memoizado + login) implementadas; bundle client, loading/skeleton e índices pendentes.
-- Teste de anti-corrida concorrente real (pendente).
-- Seed de produtos é exemplo; ajustar com o atendimento (John).
-- Usuários devem ser criados SEMPRE pelo painel Supabase (via SQL dá erro no GoTrue).
-- Dados de teste no banco podem ser limpos ao iniciar operação real.
-- Dependência `sharp` é devOnly (ícones PWA) — não afeta produção/custo.
+- PERFORMANCE: bundle client, loading/skeleton e índices pendentes.
+- Erros TypeScript pré-existentes em alguns arquivos (`printer-config-form`, `transports.ts`) — não bloqueiam dev.
 ```
 
 ---
@@ -722,6 +762,6 @@ Auditoria completa realizada (revisão de código + banco + testes de intrusão 
 ### Verificações OK
 
 - Sem API routes (menor superfície). Sem `dangerouslySetInnerHTML`/`eval` (XSS mitigado pelo React). Sem CSRF relevante (server actions + cookies httpOnly).
-- `.env.local` só tem URL + anon key (service_role **nunca** no frontend); `.gitignore` cobre `.env*`.
+- `.env.local`: URL + anon key + `SUPABASE_SERVICE_ROLE_KEY` (secret, **só servidor**); `.gitignore` cobre `.env*`. No Vercel: mesmas variáveis (incluir service_role para `/usuarios` em produção).
 - RLS em todas as tabelas; gravações de negócio só via RPC `SECURITY DEFINER` com validação de papel.
 - Nenhuma correção exigiu recurso pago do Supabase (todas em SQL/config gratuitas).

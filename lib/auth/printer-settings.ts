@@ -26,6 +26,7 @@ export async function getPrinterSettings(): Promise<PrinterConfig> {
 }
 
 export async function updatePrinterSettings(
+  _prev: PrinterSettingsResult,
   formData: FormData
 ): Promise<PrinterSettingsResult> {
   const supabase = await createClient();
