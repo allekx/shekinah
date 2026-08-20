@@ -23,14 +23,12 @@ export default async function AppLayout({
   const role = (await getRole()) ?? "cozinha";
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-[var(--background)]">
       <SessionHeader
         email={user.email ?? ""}
         role={role}
       />
-      <main className="mx-auto w-full max-w-md flex-1 px-4 pb-16 pt-0">
-        {children}
-      </main>
+      <main className="sk-app-main">{children}</main>
     </div>
   );
 }

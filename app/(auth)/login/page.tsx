@@ -78,11 +78,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <main className="relative flex min-h-screen flex-col bg-white">
-      {/* Hero com gradiente laranja */}
-      <section className="relative shrink-0 overflow-hidden px-6 pt-12 pb-28">
+    <main className="relative flex min-h-screen flex-col bg-[var(--background)] px-5 md:justify-center md:px-6 md:py-10 lg:px-8">
+      <section className="relative shrink-0 overflow-hidden px-6 pt-12 pb-28 md:mx-auto md:max-w-md md:w-full md:rounded-[2rem] md:pb-20 md:shadow-[var(--shadow-pop)] lg:max-w-lg">
         <div
-          className="absolute inset-0 bg-gradient-to-br from-[#FF8A4F] via-[#FF9F60] to-[#FFC176]"
+          className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-500 to-primary-300"
           aria-hidden
         />
         <div
@@ -90,7 +89,7 @@ export default function LoginPage() {
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute top-24 -left-8 h-40 w-40 rounded-full bg-[#FFC176]/35 blur-2xl"
+          className="pointer-events-none absolute top-24 -left-8 h-40 w-40 rounded-full bg-primary-300/35 blur-2xl"
           aria-hidden
         />
 
@@ -108,8 +107,7 @@ export default function LoginPage() {
         </div>
       </section>
 
-      {/* Card do formulário */}
-      <section className="relative -mt-16 flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-6 pt-8 pb-8 shadow-[0_-12px_40px_rgb(23_25_35_/_0.08)]">
+      <section className="relative -mt-16 flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-6 pt-8 pb-8 shadow-[0_-12px_40px_rgb(23_25_35_/_0.08)] md:mx-auto md:mt-0 md:max-w-md md:flex-none md:rounded-[2rem] md:shadow-[var(--shadow-pop)] lg:max-w-lg">
         <h2 className="mb-7 text-xl font-bold tracking-tight text-neutral-900">
           Entrar no sistema
         </h2>
@@ -120,7 +118,7 @@ export default function LoginPage() {
               E-mail
             </label>
             <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[#FF8A4F]">
+              <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-primary-500">
                 <MailIcon />
               </span>
               <input
@@ -131,7 +129,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 required
                 placeholder="usuario@shekinah.com"
-                className="h-14 w-full rounded-2xl border-0 bg-neutral-100 pr-4 pl-12 text-base text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:bg-white focus:shadow-[0_0_0_3px_rgb(255_138_79_/_0.22)] focus:ring-2 focus:ring-[#FF8A4F]/35"
+                className="sk-input-soft sk-input-soft--icon-start h-14"
               />
             </div>
           </div>
@@ -141,7 +139,7 @@ export default function LoginPage() {
               Senha
             </label>
             <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[#FF8A4F]">
+              <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-primary-500">
                 <LockIcon />
               </span>
               <input
@@ -151,7 +149,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 required
                 placeholder="••••••••"
-                className="h-14 w-full rounded-2xl border-0 bg-neutral-100 pr-12 pl-12 text-base text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:bg-white focus:shadow-[0_0_0_3px_rgb(255_138_79_/_0.22)] focus:ring-2 focus:ring-[#FF8A4F]/35"
+                className="sk-input-soft sk-input-soft--icon-start sk-input-soft--icon-end h-14"
               />
               <button
                 type="button"
@@ -165,10 +163,7 @@ export default function LoginPage() {
           </div>
 
           {state?.error && (
-            <p
-              role="alert"
-              className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-            >
+            <p role="alert" className="sk-alert-error">
               {state.error}
             </p>
           )}
@@ -176,7 +171,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={pending}
-            className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF8A4F] to-[#E87245] text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-[#FF8A4F]/30 transition hover:from-[#F07A42] hover:to-[#D96A38] active:scale-[0.99] disabled:cursor-not-allowed disabled:from-neutral-300 disabled:to-neutral-300 disabled:shadow-none"
+            className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-600 text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-500/30 transition hover:from-primary-600 hover:to-primary-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:from-neutral-300 disabled:to-neutral-300 disabled:shadow-none"
           >
             {pending ? (
               <>
@@ -188,10 +183,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        <p className="mt-auto pt-10 text-center text-xs leading-relaxed text-neutral-400">
-          Acesso restrito · usuários são criados pelo administrador
-        </p>
       </section>
     </main>
   );

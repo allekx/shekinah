@@ -14,7 +14,7 @@
  * O transporte real (rede/web-bluetooth/usb) é plugável — ver transports.ts.
  * O default é 'preview' (mostra o modal, sem impressora).
  */
-import { buildOrderReceipt, buildComplementReceipt } from "./receipts";
+import { buildOrderReceipt, buildComplementReceipt, buildCloseoutReceipt } from "./receipts";
 import { buildEscposDocument } from "./escpos";
 import { getTransport } from "./transports";
 import type { ReceiptPreview } from "./types";
@@ -30,6 +30,7 @@ export interface PrintOrderData {
 export interface PrintSettings {
   transport?: string;
   width?: number;
+  networkUrl?: string | null;
   establishment?: { name?: string; address?: string };
 }
 
@@ -37,6 +38,8 @@ export interface PrintResult {
   ok: boolean;
   /** Texto pré-formatado (para mostrar ao usuário caso falhe a impressão). */
   preview: ReceiptPreview;
+  /** true quando bytes foram enviados à impressora física. */
+  sentToPrinter?: boolean;
   /** Erro legível (quando ok=false). */
   error?: string;
 }
@@ -95,13 +98,49 @@ export async function printComplementReceipt(
   return sendToTransport(preview, settings);
 }
 
+export interface PrintCloseoutData {
+  day: string;
+  opened_at: string;
+  closed_at: string | null;
+  opened_by: string | null;
+  closed_by: string | null;
+  orders_total: number;
+  total_sales: number;
+  payments: { dinheiro: number; pix: number; cartao: number };
+  initial_cash: number;
+  expected_cash: number;
+  counted_cash: number | null;
+  cash_difference: number | null;
+  stock: {
+    product_name: string;
+    initial_qty: number;
+    sold_qty: number;
+    expected_remaining: number;
+    final_counted_qty: number | null;
+  }[];
+  status: string;
+}
+
+/** Imprime o relatório de fechamento do dia. */
+export async function printCloseoutReceipt(
+  closeout: PrintCloseoutData,
+  settings: PrintSettings = {}
+): Promise<PrintResult> {
+  const preview = buildCloseoutReceipt(closeout, {
+    name: settings.establishment?.name ?? "SHEKINAH",
+    address: settings.establishment?.address,
+  });
+
+  return sendToTransport(preview, settings);
+}
+
 /** Envia um documento ao transporte (preview mostra na tela; real envia bytes). */
 async function sendToTransport(preview: ReceiptPreview, settings: PrintSettings): Promise<PrintResult> {
-  const transport = getTransport(settings.transport ?? "preview");
+  const transport = getTransport(settings.transport ?? "preview", settings.networkUrl);
 
   // preview não imprime fisicamente: ok=true (pré-visualização na tela).
   if (transport.id === "preview") {
-    return { ok: true, preview };
+    return { ok: true, preview, sentToPrinter: false };
   }
 
   try {
@@ -113,7 +152,7 @@ async function sendToTransport(preview: ReceiptPreview, settings: PrintSettings)
     } finally {
       await transport.disconnect();
     }
-    return { ok: true, preview };
+    return { ok: true, preview, sentToPrinter: true };
   } catch (err) {
     return {
       ok: false,

@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { addItemsAction } from "@/lib/auth/orders";
+import { getPrinterSettings } from "@/lib/auth/printer-settings";
 import { printComplementReceipt } from "@/lib/printing/print";
+import { toPrintSettings } from "@/lib/printing/settings";
 
 interface Product {
   id: number;
@@ -52,7 +54,6 @@ export default function AddItemsModal({
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const qty = (id: number) => quantities[id] ?? 0;
   const setQty = (id: number, v: number) =>
@@ -96,8 +97,24 @@ export default function AddItemsModal({
     return map;
   }, [products]);
 
+  const sortedCategories = useMemo(() => {
+    const categoryRank = (category: string) => {
+      const name = category.toLowerCase();
+      if (name === "pratos") return 0;
+      if (name === "porções" || name === "porcoes") return 1;
+      if (name === "bebidas") return 2;
+      if (name === "sobremesas") return 3;
+      return 4;
+    };
+    return Object.entries(byCategory).sort(([a], [b]) => {
+      const diff = categoryRank(a) - categoryRank(b);
+      if (diff !== 0) return diff;
+      return a.localeCompare(b, "pt-BR");
+    });
+  }, [byCategory]);
+
   const confirm = async () => {
-    if (!canAdd) return;
+    if (!canAdd || pending) return;
     setPending(true);
     setError(null);
     const payload = newItems.map((it) => ({
@@ -113,31 +130,33 @@ export default function AddItemsModal({
       return;
     }
 
-    // Sucesso: imprime a comanda complementar (somente novos itens) + atualiza UI
-    setSuccess(true);
     onAdded({ id: order.id, total: res.total ?? order.total });
-    setPending(false);
+    onClose();
 
-    try {
-      await printComplementReceipt({
-        orderNumber: order.number,
-        customerName: order.customer_name,
-        createdAt: new Date().toISOString(),
-        items: res.complementItems ?? newItems.map((it) => ({
-          product_name: it.name,
-          quantity: it.quantity,
-          unit_price: it.unit_price,
-        })),
-        total: addTotal,
+    void (async () => {
+      const printSettings = toPrintSettings(await getPrinterSettings());
+      await printComplementReceipt(
+        {
+          orderNumber: order.number,
+          customerName: order.customer_name,
+          createdAt: new Date().toISOString(),
+          items: res.complementItems ?? newItems.map((it) => ({
+            product_name: it.name,
+            quantity: it.quantity,
+            unit_price: it.unit_price,
+          })),
+          total: addTotal,
+        },
+        printSettings
+      ).catch(() => {
+        // impressão nunca bloqueia a adição
       });
-    } catch {
-      // impressão nunca bloqueia a adição
-    }
+    })();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-900/60 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden sk-card sk-card--elevated">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <div>
@@ -175,7 +194,7 @@ export default function AddItemsModal({
 
         {/* Seleção de novos produtos */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {Object.entries(byCategory).map(([category, list]) => (
+          {sortedCategories.map(([category, list]) => (
             <section key={category} className="mb-4">
               <h3 className="mb-2 sk-section-title">
                 {category}
@@ -212,7 +231,7 @@ export default function AddItemsModal({
                             <button
                               type="button"
                               onClick={() => setQty(p.id, Math.max(0, n - 1))}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-lg font-bold text-neutral-700"
+                              className="sk-qty-btn h-8 w-8 text-lg"
                               aria-label={`Diminuir ${p.name}`}
                             >
                               −
@@ -222,14 +241,14 @@ export default function AddItemsModal({
                               inputMode="numeric"
                               value={n}
                               onChange={(e) => setQty(p.id, Number(e.target.value) || 0)}
-                              className="h-8 w-12 rounded-lg border border-neutral-300 text-center text-base font-bold"
+                              className="sk-qty-input h-8 w-12 text-base"
                             />
                             <button
                               type="button"
                               onClick={() =>
                                 setQty(p.id, p.available !== null ? Math.min(p.available, n + 1) : n + 1)
                               }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-lg font-bold text-neutral-700"
+                              className="sk-qty-btn h-8 w-8 text-lg"
                               aria-label={`Aumentar ${p.name}`}
                             >
                               +
@@ -249,9 +268,6 @@ export default function AddItemsModal({
         <div className="border-t border-neutral-200 px-4 py-3">
           {error && (
             <p role="alert" className="mb-2 sk-alert-error">{error}</p>
-          )}
-          {success && (
-            <p className="mb-2 sk-alert-success">Itens adicionados ao pedido.</p>
           )}
           <div className="flex items-center justify-between py-1">
             <span className="text-sm sk-text-muted">Total adicional</span>

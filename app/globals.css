@@ -4,8 +4,8 @@
    SHEKINAH — Design System
    ------------------------------------------------------------
    Redesign 100% visual. Nenhuma lógica/rotas/banco alterados.
-   Fundação: paleta neutra sofisticada + azul profissional de
-   destaque + semântica de estado (verde/âmbar/vermelho).
+   Fundação: paleta neutra sofisticada + laranja/pêssego de
+   destaque (restaurante no sítio) + semântica de estado (verde/âmbar/vermelho).
    ============================================================ */
 
 :root {
@@ -13,17 +13,17 @@
   --background: #f6f7f9;
   --foreground: #16181d;
 
-  /* Paleta principal (azul-profissional, contido) */
-  --primary-50: #eef4ff;
-  --primary-100: #dce7fd;
-  --primary-200: #c0d4fb;
-  --primary-300: #94b6f6;
-  --primary-400: #6190ee;
-  --primary-500: #3f6ee0;
-  --primary-600: #2e54c9;
-  --primary-700: #2844a8;
-  --primary-800: #253c88;
-  --primary-900: #22366d;
+  /* Paleta principal — laranja Shekinah (#FF8A4F) + pêssego (#FFC176) */
+  --primary-50: #fff7f2;
+  --primary-100: #ffede3;
+  --primary-200: #ffd9c4;
+  --primary-300: #ffc176;
+  --primary-400: #ffab62;
+  --primary-500: #ff8a4f;
+  --primary-600: #e87245;
+  --primary-700: #d05f38;
+  --primary-800: #b54e2e;
+  --primary-900: #943f26;
 
   /* Semântica */
   --success-50: #ecfdf3;
@@ -54,7 +54,7 @@
   --shadow-card-hover: 0 2px 4px rgb(23 25 35 / 0.05), 0 10px 24px -6px rgb(23 25 35 / 0.1);
   --shadow-pop: 0 8px 30px rgb(23 25 35 / 0.12);
   --shadow-btn: 0 1px 2px rgb(23 25 35 / 0.15);
-  --shadow-input-focus: 0 0 0 3px rgb(46 84 201 / 0.18);
+  --shadow-input-focus: 0 0 0 3px rgb(255 138 79 / 0.22);
 
   --radius-card: 1rem;
   --radius-input: 0.625rem;
@@ -275,14 +275,14 @@ body {
 }
 .sk-btn-primary:hover:not(:disabled) {
   background: var(--primary-700);
-  box-shadow: 0 2px 6px rgb(46 84 201 / 0.25);
+  box-shadow: 0 2px 6px rgb(255 138 79 / 0.25);
 }
 .sk-btn-primary:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: var(--shadow-btn);
 }
 .sk-btn-primary:focus-visible {
-  box-shadow: 0 0 0 3px rgb(46 84 201 / 0.3), var(--shadow-btn);
+  box-shadow: 0 0 0 3px rgb(255 138 79 / 0.3), var(--shadow-btn);
 }
 .sk-btn-primary:disabled {
   background: var(--n-300);
@@ -294,6 +294,7 @@ body {
 /* Botão secundário */
 .sk-btn-secondary {
   composes: sk-btn;
+  border-radius: var(--radius-btn);
   background: #fff;
   border: 1px solid var(--n-300);
   color: var(--n-700);
@@ -307,7 +308,7 @@ body {
   transform: translateY(1px);
 }
 .sk-btn-secondary:focus-visible {
-  box-shadow: 0 0 0 3px rgb(46 84 201 / 0.2);
+  box-shadow: 0 0 0 3px rgb(255 138 79 / 0.2);
   border-color: var(--primary-500);
 }
 .sk-btn-secondary:disabled {
@@ -346,7 +347,7 @@ body {
   color: var(--n-900);
 }
 .sk-btn-ghost:focus-visible {
-  box-shadow: 0 0 0 3px rgb(46 84 201 / 0.2);
+  box-shadow: 0 0 0 3px rgb(255 138 79 / 0.2);
 }
 .sk-btn-ghost:disabled {
   opacity: 0.5;
@@ -359,7 +360,8 @@ body {
   border-radius: var(--radius-input);
   border: 1px solid var(--n-300);
   background: #fff;
-  padding: 0.75rem 1rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
   font-size: 1rem;
   line-height: 1.4;
   color: var(--n-900);
@@ -383,6 +385,13 @@ body {
 }
 .sk-input--error:focus {
   box-shadow: 0 0 0 3px rgb(220 47 47 / 0.18);
+}
+
+.sk-input--icon-start {
+  padding-left: 3rem;
+}
+.sk-input--icon-end {
+  padding-right: 2.5rem;
 }
 
 /* Label padrão */
@@ -420,11 +429,60 @@ body {
 .sk-alert-info {
   border-radius: var(--radius-btn);
   background: var(--primary-50);
-  border: 1px solid rgb(46 84 201 / 0.16);
+  border: 1px solid rgb(255 138 79 / 0.16);
   color: var(--primary-700);
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
+}
+
+.sk-alert-warn {
+  border-radius: var(--radius-btn);
+  background: var(--warn-50);
+  border: 1px solid rgb(217 138 19 / 0.16);
+  color: var(--warn-600);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Banner de sucesso (dia encerrado, confirmação) */
+.sk-hero-success {
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, var(--success-600), var(--success-500));
+  padding: 1.5rem;
+  text-align: center;
+  color: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+/* Input suave (login, telas hero) */
+.sk-input-soft {
+  width: 100%;
+  border-radius: var(--radius-card);
+  border: 0;
+  background: var(--n-100);
+  padding-block: 0.875rem;
+  padding-inline: 1rem;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--n-900);
+  outline: none;
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.sk-input-soft::placeholder {
+  color: var(--n-400);
+}
+.sk-input-soft:focus {
+  background: #fff;
+  box-shadow: var(--shadow-input-focus);
+}
+/* Variantes com ícone dentro do campo (evita texto/placeholder sob o ícone) */
+.sk-input-soft--icon-start {
+  padding-left: 3rem;
+}
+.sk-input-soft--icon-end {
+  padding-right: 3rem;
 }
 
 /* Estado vazio */
@@ -464,4 +522,253 @@ body {
 .sk-text-muted {
   color: var(--n-500);
   font-size: 0.875rem;
+}
+
+/* Shell responsivo (mobile → tablet → notebook) */
+.sk-app-shell {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 28rem;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 768px) {
+  .sk-app-shell {
+    max-width: 42rem;
+    padding-inline: 1.75rem;
+  }
+}
+@media (min-width: 1024px) {
+  .sk-app-shell {
+    max-width: 56rem;
+    padding-inline: 2.25rem;
+  }
+  .sk-app-shell--wide {
+    max-width: 75rem;
+  }
+}
+
+.sk-app-main {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 28rem;
+  padding-inline: 1.25rem;
+  flex: 1;
+  padding-top: 1rem;
+  padding-bottom: 4rem;
+}
+@media (min-width: 768px) {
+  .sk-app-main {
+    max-width: 42rem;
+    padding-inline: 1.75rem;
+  }
+}
+@media (min-width: 1024px) {
+  .sk-app-main {
+    max-width: 56rem;
+    padding-inline: 2.25rem;
+  }
+  /* Cozinha: kanban com 3 colunas precisa de mais largura */
+  .sk-app-main:has(.sk-kanban) {
+    max-width: 75rem;
+  }
+}
+
+.sk-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-bottom: 0.5rem;
+}
+
+.sk-page-header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--n-900);
+}
+@media (min-width: 768px) {
+  .sk-page-header h1 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Botão de sucesso (confirmar pedido, registrar pagamento) */
+.sk-btn-success {
+  composes: sk-btn;
+  border-radius: var(--radius-btn);
+  background: var(--success-600);
+  color: #fff;
+  box-shadow: var(--shadow-btn);
+  padding: 0.75rem 1.25rem;
+}
+.sk-btn-success:hover:not(:disabled) {
+  background: var(--success-500);
+}
+.sk-btn-success:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.sk-btn-success:disabled {
+  background: var(--n-300);
+  color: var(--n-400);
+  cursor: not-allowed;
+}
+
+/* Botão escuro (encerrar dia, imprimir) */
+.sk-btn-dark {
+  composes: sk-btn;
+  background: var(--n-900);
+  color: #fff;
+  padding: 0.875rem 1.25rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.8125rem;
+}
+.sk-btn-dark:hover:not(:disabled) {
+  background: var(--n-800);
+}
+.sk-btn-dark:disabled {
+  background: var(--n-300);
+  color: var(--n-400);
+  cursor: not-allowed;
+}
+
+.sk-btn-sm {
+  padding: 0.5rem 0.875rem;
+  font-size: 0.75rem;
+}
+
+/* Controles de quantidade (+/−) */
+.sk-qty-btn {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-btn);
+  background: var(--n-100);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--n-700);
+  transition: background-color var(--transition-fast);
+}
+.sk-qty-btn:active {
+  background: var(--n-200);
+}
+
+.sk-qty-input {
+  height: 2.5rem;
+  width: 3.5rem;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--n-300);
+  background: #fff;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sk-qty-input:focus {
+  border-color: var(--primary-500);
+  box-shadow: var(--shadow-input-focus);
+  outline: none;
+}
+
+/* Chip de forma de pagamento */
+.sk-method-chip {
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--n-300);
+  background: #fff;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--n-600);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+.sk-method-chip--active {
+  border-color: var(--primary-600);
+  background: var(--primary-50);
+  color: var(--primary-700);
+}
+
+/* Resumo escuro (total do pedido) */
+.sk-summary-dark {
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, var(--n-900), var(--n-800) 55%, var(--n-900));
+  padding: 1rem;
+  color: #fff;
+  box-shadow: 0 10px 24px rgb(23 25 35 / 0.15);
+}
+
+/* Rodapé fixo alinhado ao shell */
+.sk-sticky-footer {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 10;
+  border-top: 1px solid var(--n-200);
+  background: rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+.sk-sticky-footer__inner {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 28rem;
+  padding-inline: 1.25rem;
+  padding-bottom: 0;
+  padding-top: 0;
+}
+@media (min-width: 768px) {
+  .sk-sticky-footer__inner {
+    max-width: 42rem;
+    padding-inline: 1.75rem;
+  }
+}
+@media (min-width: 1024px) {
+  .sk-sticky-footer__inner {
+    max-width: 56rem;
+    padding-inline: 2.25rem;
+  }
+}
+
+/* Reserva espaço no fim da página para o rodapé fixo não cobrir conteúdo */
+.sk-page-with-sticky-footer {
+  padding-bottom: calc(11.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Kanban responsivo */
+.sk-kanban {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .sk-kanban {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .sk-kanban--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .sk-kanban--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Item interno de lista (caixa, estoque) */
+.sk-list-row {
+  overflow: hidden;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--n-200);
+  background: #fff;
+}
+
+.sk-highlight-primary {
+  margin-top: 0.75rem;
+  border-radius: var(--radius-btn);
+  border: 1px solid rgb(255 138 79 / 0.14);
+  background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+  padding: 0.875rem 1rem;
 }

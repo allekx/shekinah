@@ -160,7 +160,7 @@ export default function KitchenBoard({
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header enxuto */}
       <header className="sticky top-0 z-10 border-b border-neutral-200/80 bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-3 px-4 py-3">
+        <div className="flex w-full items-center justify-between gap-3 py-3">
           <div className="flex items-center gap-2">
             <BackButton />
             <div>
@@ -172,17 +172,16 @@ export default function KitchenBoard({
             {orders.filter((o) => o.status !== "pronto").length} a fazer
           </span>
         </div>
-        <div className="h-0.5 w-full bg-gradient-to-r from-[#2e54c9] via-[#3f6ee0]/60 to-transparent" />
+        <div className="h-0.5 w-full bg-gradient-to-r from-primary-600 via-primary-500/60 to-transparent" />
       </header>
 
       {actionError && (
-        <div className="mx-auto max-w-[1200px] px-4 mt-3">
+        <div className="mt-3 w-full">
           <p role="alert" className="sk-alert-error">{actionError}</p>
         </div>
       )}
 
-      {/* 3 colunas */}
-      <main className="mx-auto flex-1 w-full max-w-[1200px] grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
+      <main className="sk-kanban sk-kanban--3 w-full flex-1 py-4">
         {COLUMNS.map((col) => {
           const list = byStatus(col.key);
           return (

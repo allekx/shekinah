@@ -1,6 +1,6 @@
 import { createClient, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import BackButton from "@/components/back-button";
+import PageShell from "@/components/page-shell";
 import ProductForm from "./product-form";
 import ProductList from "./product-list";
 
@@ -21,19 +21,12 @@ export default async function ProdutosPage() {
     .order("name", { ascending: true });
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Produtos</h1>
-          <p className="text-sm text-neutral-500">
-            Gerencie nome, categoria, preço e disponibilidade.
-          </p>
-        </div>
-      </header>
-
+    <PageShell
+      title="Produtos"
+      subtitle="Gerencie nome, categoria, preço e disponibilidade."
+    >
       <ProductForm />
       <ProductList products={products ?? []} />
-    </div>
+    </PageShell>
   );
 }

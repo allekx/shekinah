@@ -18,7 +18,7 @@ export default function SessionHeader({
 
   return (
     <header className="sticky top-0 z-10 border-b border-neutral-200/60 bg-white/90 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
+      <div className="sk-app-shell flex items-center justify-between py-3">
         <BrandWordmark
           variant="dark"
           iconSize="sm"
@@ -35,7 +35,7 @@ export default function SessionHeader({
         </button>
       </div>
       {/* faixa sutil de identidade */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-[#2e54c9] via-[#3f6ee0]/60 to-transparent" />
+      <div className="h-0.5 w-full bg-gradient-to-r from-primary-600 via-primary-500/60 to-transparent" />
     </header>
   );
 }

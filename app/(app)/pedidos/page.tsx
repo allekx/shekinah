@@ -1,5 +1,6 @@
 import { createClient, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import PageShell from "@/components/page-shell";
 import OrdersBoard from "./orders-board";
 
 /** Acompanhamento de PEDIDOS do dia aberto (somente john).
@@ -23,12 +24,9 @@ export default async function PedidosPage() {
 
   if (!day) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-bold text-neutral-900">Pedidos</h1>
-        <p className="rounded-2xl bg-white p-5 text-center text-sm text-neutral-500 shadow-sm">
-          Nenhum dia aberto. Inicie o dia para acompanhar pedidos.
-        </p>
-      </div>
+      <PageShell title="Pedidos">
+        <p className="sk-empty">Nenhum dia aberto. Inicie o dia para acompanhar pedidos.</p>
+      </PageShell>
     );
   }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { parseMoney } from "@/lib/money";
 
 export interface CloseDayResult {
   error?: string;
@@ -17,11 +18,7 @@ export interface CloseDayResult {
 export async function closeDay(formData: FormData): Promise<CloseDayResult> {
   const supabase = await createClient();
   const dayId = String(formData.get("day_id") ?? "");
-  const cashRaw = String(formData.get("counted_cash") ?? "")
-    .replace("R$", "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const countedCash = Number(cashRaw);
+  const countedCash = parseMoney(String(formData.get("counted_cash") ?? ""));
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
   if (!dayId) return { error: "Dados inválidos." };
@@ -59,5 +56,7 @@ export async function closeDay(formData: FormData): Promise<CloseDayResult> {
   }
 
   revalidatePath("/", "layout");
-  redirect("/fechamento?encerrado=1");
+  revalidatePath("/caixa");
+  revalidatePath("/relatorio", "layout");
+  redirect(`/relatorio/${dayId}`);
 }

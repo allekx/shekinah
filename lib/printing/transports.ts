@@ -61,17 +61,33 @@ export class WebUsbTransport implements PrinterTransport {
   }
 }
 
-/** Rede/Wi-Fi (POST HTTP para a impressora). Funciona em qualquer navegador. */
+/** Rede/Wi-Fi — envia bytes ESC/POS por HTTP POST para a URL configurada. */
 export class NetworkTransport implements PrinterTransport {
   readonly id = "network";
   readonly label = "Rede Wi-Fi";
   readonly description =
-    "Envia o documento por HTTP para a URL da impressora (networkUrl). Depende do modelo suportar recepção por rede (ex.: escpos em TCP/HTTP).";
+    "Envia o cupom por HTTP POST (application/octet-stream) para a URL da impressora. Celular e impressora na mesma rede Wi-Fi.";
+
+  constructor(private readonly url: string | null = null) {}
 
   async connect() {}
   async disconnect() {}
-  async print(_data: Uint8Array) {
-    throw new Error("NetworkTransport: não implementado até definir o modelo da impressora (networkUrl).");
+
+  async print(data: Uint8Array): Promise<void> {
+    const url = this.url?.trim();
+    if (!url) {
+      throw new Error("Configure a URL da impressora em Impressora.");
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      body: data,
+      headers: { "Content-Type": "application/octet-stream" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Impressora respondeu HTTP ${response.status}.`);
+    }
   }
 }
 
@@ -98,7 +114,8 @@ export const TRANSPORTS: PrinterTransport[] = [
 ];
 
 /** Resolve um transporte pelo id. */
-export function getTransport(id: string): PrinterTransport {
+export function getTransport(id: string, networkUrl?: string | null): PrinterTransport {
+  if (id === "network") return new NetworkTransport(networkUrl);
   const found = TRANSPORTS.find((t) => t.id === id);
   return found ?? new PreviewTransport();
 }

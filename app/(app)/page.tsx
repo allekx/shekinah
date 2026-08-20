@@ -1,5 +1,7 @@
 import { createClient, getRole } from "@/lib/supabase/server";
+import { getTimeGreeting } from "@/lib/greeting";
 import { redirect } from "next/navigation";
+import HomeDashboard from "./home-dashboard";
 
 /** Dashboard principal do John (mobile-first).
  *  - Sem dia aberto → 🌅 INICIAR DIA.
@@ -63,14 +65,20 @@ export default async function HomePage() {
       .sort((a, b) => a.remaining - b.remaining);
   }
 
-  const fmtBRL = (v: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+  const openedAtLabel = day
+    ? new Date(day.opened_at).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+
+  const greeting = getTimeGreeting();
 
   // ---------- SEM DIA ABERTO ----------
   if (!day) {
     return (
-      <div className="-mx-4 flex min-h-[calc(100dvh-4.5rem)] flex-col bg-white">
-        <section className="relative shrink-0 overflow-hidden px-6 pt-6 pb-24">
+      <div className="flex min-h-[calc(100dvh-4.5rem)] flex-col">
+        <section className="relative shrink-0 overflow-hidden rounded-[1.75rem] px-6 pt-6 pb-20">
           <div
             className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-400"
             aria-hidden
@@ -86,7 +94,7 @@ export default async function HomePage() {
 
           <div className="relative">
             <h1 className="max-w-xs text-[2rem] leading-tight font-bold tracking-tight text-white">
-              Bom dia!
+              {greeting}!
             </h1>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/80">
               Nenhum dia aberto. Para registrar pedidos, vendas e caixa, inicie
@@ -95,7 +103,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="relative -mt-14 flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-6 pt-8 pb-8 shadow-[0_-12px_40px_rgb(23_25_35_/_0.08)]">
+        <section className="relative mt-4 flex flex-1 flex-col rounded-[1.75rem] bg-white px-6 pt-8 pb-8 shadow-[var(--shadow-card)]">
           <h2 className="mb-2 text-xl font-bold tracking-tight text-neutral-900">
             Pronto para começar?
           </h2>
@@ -120,102 +128,15 @@ export default async function HomePage() {
 
   // ---------- COM DIA ABERTO ----------
   return (
-    <div className="space-y-5 pb-8 pt-4">
-      {/* Status do dia */}
-      <section className="overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-700 via-primary-600 to-primary-500 p-5 text-white shadow-lg shadow-primary-600/20">
-        <div className="flex items-center justify-between">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-300">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Em andamento
-          </p>
-          <span className="sk-badge sk-badge--success">Dia ativo</span>
-        </div>
-        <h1 className="mt-1 text-xl font-extrabold tracking-tight">{day.day}</h1>
-        <p className="text-sm text-neutral-300">
-          iniciado às{" "}
-          {new Date(day.opened_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-        </p>
-
-        {/* métricas principais */}
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
-            <p className="sk-figure text-2xl text-white">{ordersCount}</p>
-            <p className="text-[11px] font-medium text-neutral-300">Pedidos hoje</p>
-          </div>
-          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
-            <p className="sk-figure text-2xl text-white">{fmtBRL(salesToday)}</p>
-            <p className="text-[11px] font-medium text-neutral-300">Vendas hoje</p>
-          </div>
-          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
-            <p className="sk-figure text-2xl text-white">{preparingCount}</p>
-            <p className="text-[11px] font-medium text-neutral-300">Em preparo</p>
-          </div>
-          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
-            <p className="sk-figure text-2xl text-emerald-300">{readyCount}</p>
-            <p className="text-[11px] font-medium text-neutral-300">Prontos</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Ação principal: NOVO PEDIDO */}
-      <a
-        href="/pedidos/novo"
-        className="block rounded-2xl bg-gradient-to-r from-primary-500 to-primary-700 py-6 text-center text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-600/25 transition hover:from-primary-600 hover:to-primary-800 active:scale-[0.99]"
-      >
-        ＋ Novo pedido
-      </a>
-
-      {/* Estoque baixo */}
-      <section className="sk-card p-4">
-        <h2 className="sk-section-title mb-3">Estoque baixo</h2>
-        {lowStock.length === 0 ? (
-          <p className="py-2 text-center text-sm sk-text-muted">Nenhum produto com estoque baixo 🎉</p>
-        ) : (
-          <ul className="divide-y divide-neutral-100">
-            {lowStock.map((s) => (
-              <li key={s.name} className="flex items-center justify-between py-2.5">
-                <span className="text-sm font-medium text-neutral-800">{s.name}</span>
-                <span
-                  className={`sk-badge ${
-                    s.remaining === 0 ? "sk-badge--danger" : "sk-badge--warn"
-                  }`}
-                >
-                  {s.remaining === 0 ? "ESGOTADO" : `${s.remaining} restante(s)`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Ações principais */}
-      <section>
-        <h2 className="sk-section-title mb-3">Ações</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { href: "/pedidos", label: "Pedidos", icon: "📋" },
-            { href: "/caixa", label: "Caixa", icon: "💰" },
-            { href: "/estoque", label: "Estoque", icon: "📦" },
-            { href: "/fechamento", label: "Encerrar dia", icon: "🔒", danger: true },
-          ].map((a) => (
-            <a
-              key={a.href}
-              href={a.href}
-              className={`flex items-center justify-center gap-2 rounded-xl p-5 text-center text-base font-bold shadow-sm transition active:scale-[.98] ${
-                a.danger
-                  ? "sk-card border-red-100 bg-red-50 text-red-700 hover:bg-red-100"
-                  : "sk-card sk-card--interactive text-neutral-800"
-              }`}
-            >
-              <span className="text-lg">{a.icon}</span>
-              {a.label}
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <p className="text-center text-xs text-neutral-400">
-        Histórico e relatórios
-      </p>
-    </div>
+    <HomeDashboard
+      dayId={day.id}
+      day={day.day}
+      openedAtLabel={openedAtLabel}
+      initialOrdersCount={ordersCount}
+      initialSalesToday={salesToday}
+      initialPreparingCount={preparingCount}
+      initialReadyCount={readyCount}
+      initialLowStock={lowStock}
+    />
   );
 }

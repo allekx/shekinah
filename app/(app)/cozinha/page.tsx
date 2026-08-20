@@ -25,10 +25,8 @@ export default async function CozinhaPage() {
 
   if (!day) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-100 px-4">
-        <p className="rounded-2xl bg-white p-6 text-center text-base text-neutral-500 shadow-sm">
-          Aguarde John iniciar o dia para começar a receber pedidos.
-        </p>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
+        <p className="sk-empty max-w-sm">Aguarde John iniciar o dia para começar a receber pedidos.</p>
       </div>
     );
   }

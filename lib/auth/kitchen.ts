@@ -34,6 +34,7 @@ export async function updateStatusAction(formData: FormData): Promise<KitchenAct
   }
 
   // Realtime cobre a atualização nas telas; revalidação p/ segurança nos SSRs.
+  revalidatePath("/", "layout");
   revalidatePath("/cozinha", "layout");
   revalidatePath("/pedidos", "layout");
   return {};

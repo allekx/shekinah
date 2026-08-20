@@ -45,13 +45,14 @@ O objetivo principal do sistema é permitir que o estabelecimento controle todo 
 SHEKINAH/
 ├─ cloud.md                    # Documento Central de Memória e Continuidade
 ├─ app/                        # Frontend Next.js (App Router)
-│  ├─ (auth)/login/page.tsx    # Login mobile-first (sem cadastro público)
+│  ├─ (auth)/login/page.tsx    # Login mobile-first — hero laranja + card flutuante (sem cadastro público)
 │  ├─ (app)/layout.tsx         # Shell autenticado (header + sessão + logout)
-│  ├─ (app)/session-header.tsx # Cabeçalho de sessão (perfil + botão sair)
-│  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA
+│  ├─ (app)/session-header.tsx # Cabeçalho de sessão (marca + perfil + botão sair)
+│  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA (visual alinhado ao login)
 │  ├─ (app)/abrir-dia/         # Abertura do dia
 │  │  ├─ page.tsx              #   server: carrega produtos, redireciona se dia aberto
-│  │  └─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar
+│  │  ├─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar
+│  │  └─ open-day-add-product.tsx  # client: cadastrar produto antes de abrir o dia
 │  ├─ (app)/cozinha/           # Interface exclusiva da cozinha
 │  │  ├─ page.tsx              #   server: pedidos do dia (sem preços)
 │  │  └─ kitchen-board.tsx     #   client: 3 colunas + Realtime + botões
@@ -100,6 +101,8 @@ SHEKINAH/
 │     ├─ receipts.ts           #   comanda, complemento, relatório de fechamento
 │     └─ transports.ts         #   transportes plugáveis (preview default + stubs)
 ├─ components/
+│  ├─ brand-mark-icon.tsx         # Ícone da marca (sítio + cozinha + pedido)
+│  ├─ brand-wordmark.tsx          # Marca Shekinah (ícone + logotipo tipográfico)
 │  ├─ print/
 │  │  └─ print-preview-modal.tsx  # Pré-visualização (modal monoespaçado)
 │  ├─ sw-register.tsx             # Registro do service worker (PWA)
@@ -214,6 +217,7 @@ Criação de usuários: no painel Supabase (Auth → Users → Add user). O trig
 - [x] Banco de dados (schema + migrations + RLS + RPCs) — migrations EXECUTADAS e validadas no projeto Supabase real
 - [x] Autenticação (login/logout/sessão/proteção de rotas/perfil) — testada com usuários reais do painel
 - [x] Abertura do dia (tela /abrir-dia + dashboard + RPC) — testada
+- [x] Cadastro de produto na abertura do dia (/abrir-dia — antes de confirmar abertura; reutiliza `createProduct`)
 - [x] Estoque inicial (grade com [-] qty [+], validação, persistência) — testada
 - [x] Caixa inicial (informado na abertura, registrado) — testado
 - [x] Produtos (CRUD: nome, categoria, preço, ativo/inativo; somente john) — testado
@@ -225,15 +229,9 @@ Criação de usuários: no painel Supabase (Auth → Users → Add user). O trig
 - [x] Fechamento do dia (tela /fechamento) — conferência (vendas/caixa/estoque), confirmar, bloqueia dia, DIA ENCERRADO + IMPRIMIR RELATÓRIO
 - [x] Impressão (arquitetura modular) — camada lib/printing + preview; formatos comanda/complemento/relatório prontos; transportes plugáveis (método a definir)
 - [x] Histórico e Relatórios — /historico (dias encerrados) e /relatorio/[dayId] (detalhes + imprimir relatório)
-- [x] Dashboard principal do John (home /) — sem dia → 🌅 INICIAR DIA; com dia → 🟢 DIA EM ANDAMENTO (pedidos/vendas/preparo/prontos/estoque baixo) + ações (NOVO PEDIDO em destaque)
+- [x] Dashboard principal do John (home /) — sem dia → INICIAR DIA (hero + card); com dia → DIA EM ANDAMENTO (pedidos/vendas/preparo/prontos/estoque baixo) + ações (NOVO PEDIDO em destaque)
+- [x] Identidade visual (login + header + app) — ícone sítio/restaurante, logotipo SHEKINAH, paleta laranja `#FF8A4F` / `#FFC176` via tokens `primary-*` em `globals.css`
 - [x] PWA (Android) — manifest, ícones (192/512/maskable/apple), service worker manual, viewport, banner de conexão, anti-duplicação verificada
-- [ ] Cozinha
-- [ ] Pagamento
-- [ ] Caixa
-- [ ] Conferência
-- [ ] Fechamento
-- [ ] Impressão
-- [ ] Relatórios
 
 Legenda: `[x]` concluído · `[~]` parcialmente implementado · `[ ]` ainda não implementado
 
@@ -288,6 +286,9 @@ DIA ENCERRADO
 - Foi decidido que **complemento é permitido com pagamento parcial** (bloqueado apenas após `paid=true`).
 - Foi decidido que **não há edição destrutiva de itens já enviados**; remoção é operação separada com auditoria (fora do escopo atual).
 - Foi decidido que **a cozinha identifica complemento** (🔔 COMPLEMENTO — PEDIDO #X) e que a **impressão do complemento é uma comanda complementar separada** (não reimprime o pedido inteiro).
+- Foi decidido que **novos produtos podem ser cadastrados na tela /abrir-dia** antes de iniciar o dia (reutiliza `createProduct`; ordem da grade: Pratos → Bebidas → cadastrar produto → caixa).
+- Foi decidida a **identidade visual da marca**: ícone customizado (casa rústica + fumaça de cozinha + prato) substituindo a letra "S"; logotipo **SHEKINAH** em uppercase com `tracking-[0.18em]` (componentes `brand-mark-icon` + `brand-wordmark`).
+- Foi decidida a **paleta laranja da identidade visual** (restaurante no sítio): laranja forte `#FF8A4F` (`primary-500`) e pêssego `#FFC176` (`primary-300`). Escala completa em `app/globals.css` (`primary-50`…`primary-900`); substitui o azul anterior em todo o app (botões, gradientes, focus, PWA `theme_color`).
 
 ## 11. Impressão
 
@@ -529,59 +530,68 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **Solução preparada (migration local `0020_allow_reopen_same_day.sql`)**: remover `business_days_day_key` (UNIQUE(day)). A regra de "no máximo 1 dia aberto por vez" continua garantida pelo índice parcial único `business_days_one_open_idx` (UNIQUE(1) WHERE status='aberto'). Dia fechado nunca é apagado; reabrir a mesma data cria novo registro com novo id (histórico/pedidos do anterior intactos).
 - **STATUS: AGUARDANDO AUTORIZAÇÃO PARA APLICAR** (migration NÃO rodada no banco; NADA foi alterado em produção).
 
+### 19/08/2026 — ABERTURA DO DIA: CADASTRO DE PRODUTO + REDESIGN VISUAL (LOGIN / HOME / MARCA)
+
+**Cadastro de produto em /abrir-dia (funcional — sem alteração de banco):**
+- **`open-day-add-product.tsx`**: formulário expansível "＋ Cadastrar novo produto" na tela de abrir dia — nome, categoria (seletor com categorias existentes ou nova), preço; `tracks_stock` sempre ativo.
+- Reutiliza server action **`createProduct`** (`lib/auth/products.ts`); `revalidatePath("/abrir-dia")` após criar.
+- **Ordem da tela**: Pratos → Bebidas → cadastrar produto → caixa inicial → confirmar.
+- **Seletor de categoria**: dropdown customizado (substitui `datalist` — corrigia posicionamento errado no mobile); filtra ao digitar; opção "Nova categoria: …".
+- Categorias padrão sempre disponíveis: **Pratos**, **Bebidas** (+ demais do catálogo).
+- Build OK. **NÃO commitado/deployado ainda.**
+
+**Redesign visual (100% visual — mesma autenticação e rotas):**
+- **Login** (`app/(auth)/login/page.tsx`): layout moderno — hero com gradiente, card branco flutuante, campos com ícones, mostrar/ocultar senha, botão gradiente. Paleta **laranja** `#FF8A4F` (forte) + `#FFC176` (pêssego).
+- **Marca compartilhada**: `components/brand-mark-icon.tsx` (sítio + cozinha + pedido) + `components/brand-wordmark.tsx` (ícone + SHEKINAH uppercase).
+- **Header** (`session-header.tsx`): ícone e tipografia iguais ao login (variante escura).
+- **Home sem dia aberto** (`page.tsx`): hero gradiente laranja + card flutuante + botão INICIAR DIA (padrão login); header já traz a marca.
+- **Home com dia aberto**: card de status e botão NOVO PEDIDO com gradiente `primary-*`.
+- **Layout app** (`layout.tsx`): fundo branco.
+
+### 19/08/2026 (noite) — PALETA LARANJA COMO IDENTIDADE GLOBAL
+
+- **`app/globals.css`**: tokens `primary-*` redefinidos — base `#FF8A4F` (500) e `#FFC176` (300); sombras/focus dos componentes `sk-*` atualizadas.
+- **Login** passa a usar `primary-*` (sem hex hardcoded).
+- **Telas com `blue-*` ou hex azul** migradas para `primary-*` (abrir-dia, caixa, estoque, fechamento, novo pedido, header, cozinha).
+- **PWA**: `theme_color` / `themeColor` → `#FF8A4F`; `public/icon.svg` atualizado (PNG precisa regerar com `node scripts/generate-icons.mjs` se desejado).
+- Build OK. **NÃO commitado/deployado ainda.**
+
 ## 15. Estado atual
 
 ```
 ESTADO ATUAL DO PROJETO:
 Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0021,
-11 tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída (regras críticas validadas + correções sem
-custo). BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅ (fluxo/permissões/robustez/mobile).
-REVISÃO TÉCNICA (12/08/2026) CONCLUÍDA E VALIDADA: correções de código (cancelar pedido, troco,
-pending no caixa, destaque de novo na cozinha, ESC/POS) + migrations 0018/0019 aplicadas e VALIDADAS
-no banco real (10/10: troco em dinheiro, pronto+pago=entregue, cancel_order, RLS inativos).
-MIGRATION 0020 APLICADA no banco real (12/08/2026): removido UNIQUE(day) em business_days — permite
-reabrir o mesmo dia após fechamento (one_open_idx mantém 1 dia aberto). Verificado (índice removido,
-dados intactos).
-MIGRATION 0021 APLICADA no banco real (12/08/2026): printed_at + print_attempts em orders (auditoria
-de impressão da comanda). Verificado (colunas criadas).
-REQUISITO OFICIAL DE IMPRESSÃO IMPLEMENTADO (12/08/2026): comanda física térmica NÃO fiscal ao criar
-pedido (obrigatória junto com a tela da cozinha), desacoplada (falha não perde o pedido), com
-reimpressão e auditoria. Transporte físico real depende da impressora a escolher (default preview).
-Botões de voltar adicionados às telas secundárias. Ver seção 11.
-ADICIONAR ITENS A PEDIDO EXISTENTE IMPLEMENTADO (12/08/2026, noite): botão "+ Adicionar itens" no
-board de pedidos + modal de seleção (cliente, itens atuais, novos produtos, total adicional) →
-RPC add_items_to_order (ADIÇÃO, sem duplicar, mantém id/cliente/status, recalcula total, auditoria
-order_complements) → impressão da COMANDA COMPLEMENTAR (somente novos itens). Sem alteração de banco
-(usada a RPC existente da migration 0011). Limpeza visual (exposição de rotas/detalhes técnicos)
-aplicada. NÃO commitado/deployado ainda.
-Dia atual no banco: 2026-08-11 (ABERTO — dia de teste para validação).
+11 tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída. BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅.
+Funcionalidades operacionais completas (abertura → fechamento). Impressão web (preview + comanda/complemento) OK;
+transporte físico da impressora ainda por definir.
+
+ALTERAÇÕES LOCAIS RECENTES (19/08/2026 — NÃO commitadas/deployadas):
+- /abrir-dia: cadastro de produto antes de iniciar o dia (Pratos → Bebidas → novo produto → caixa).
+- Seletor de categoria customizado no cadastro de produto (mobile).
+- Redesign visual login/marca/home + **paleta laranja global** (`primary-*` = #FF8A4F / #FFC176).
+- Alterações visuais em várias telas do git status (cozinha, pedidos, produtos, globals.css) — revisão/deploy pendente.
 
 ÚLTIMA ETAPA CONCLUÍDA:
-Revisão técnica completa validada: correções LOCAIS (build OK) + migrations 0018/0019 validadas no
-banco real (10/10 testes) + migration 0020 aplicada e verificada (reabrir mesmo dia) + ADICIONAR
-ITENS + COMANDA COMPLEMENTAR implementado (build OK).
+Cadastro de produto em /abrir-dia + redesign visual + **paleta laranja global no design system** — build OK local.
 
 PRÓXIMA ETAPA:
-1) ✅ **Signup público DESATIVADO** no painel Supabase (usuário confirmou em 12/08/2026) — brecha da auditoria fechada.
-2) ✅ **Deploy no Vercel realizado pelo usuário** (via repositório GitHub) — 12/08/2026. Sistema no ar em URL `*.vercel.app`. **Deploy manual da última alteração (botões voltar + fix UX + impressão + adicionar itens + limpeza visual) pendente — usuário fará pelo terminal.**
-3) **Verificar variáveis de ambiente no Vercel** (`NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`) — são obrigatórias e não são commitadas (`.env.local` fica fora do repositório). Sem elas o app não conecta ao Supabase.
-4) ✅ **Migration 0020 APLICADA** (reabrir mesmo dia) — 12/08/2026.
-5) ✅ **REQUISITO OFICIAL IMPRESSÃO IMPLEMENTADO (12/08/2026)** — comanda física integrada ao fluxo de novo pedido (desacoplada — falha de impressão não perde pedido; modal de confirmação + reimpressão). Migration `0021` (printed_at/print_attempts) aplicada no banco. **Pendente apenas o transporte físico REAL (rede/web-bluetooth/usb) — depende do modelo da impressora a escolher; default é preview.** Ver seção 11.
-6) ✅ **ADICIONAR ITENS + COMANDA COMPLEMENTAR IMPLEMENTADO (12/08/2026, noite)** — botão "+ Adicionar itens" no board de pedidos + modal (produtos com quantidade, total adicional) → RPC add_items_to_order → comanda complementar impressa (somente novos itens). **Sem alteração de banco. NÃO commitado ainda.**
-7) Operação real: abrir um novo dia.
-8) Teste de anti-corrida concorrente real (pendente).
+1) Commit + deploy manual das alterações locais (usuário fará pelo terminal).
+2) Regerar ícones PNG do PWA (`node scripts/generate-icons.mjs`) se quiser ícone laranja no celular.
+3) Verificar variáveis de ambiente no Vercel (URL + anon key).
+4) Transporte físico REAL da impressora (rede/web-bluetooth/usb) — depende do modelo escolhido.
+5) Operação real: abrir um novo dia com catálogo/estoque definitivos.
+6) Teste de anti-corrida concorrente real (pendente).
 
 PROBLEMAS PENDENTES:
-- **PERFORMANCE — AUDITORIA REALIZADA (12/08/2026, seção 17)**: gargalo CRÍTICO (chamadas redundantes de auth/perfil) **CORRIGIDO** via `getUser`/`getRole` memoizados; login otimizado (sem `getUser()` redundante). Pendentes: bundle client (ALTO), paralelização, loading/skeleton, índices. Build OK, NÃO commitado.
-- Confirmar que as variáveis de ambiente estão configuradas no Vercel (URL + anon key).
-- Modelo/método da impressora INDEFINIDO — **fluxo de impressão web IMPLEMENTADO (comanda + preview + reimpressão); o TRANSPORTE físico real continua por definir até escolher o modelo da impressora (ver seção 11).**
-- Há um dia FECHADO (2026-08-11) com pedidos de teste — pode ser limpo ao iniciar operação real.
+- Alterações locais (19/08/2026) **NÃO commitadas/deployadas**.
+- Ícones PNG do PWA (`icon-192/512`) ainda podem estar na cor azul antiga — regerar via `scripts/generate-icons.mjs` após validar `icon.svg`.
+- Modelo/método da impressora INDEFINIDO (fluxo web OK; transporte real por definir — seção 11).
+- PERFORMANCE: otimizações 1 e 3 (auth memoizado + login) implementadas; bundle client, loading/skeleton e índices pendentes.
 - Teste de anti-corrida concorrente real (pendente).
 - Seed de produtos é exemplo; ajustar com o atendimento (John).
-- Usuários devem ser criados SEMPRE pelo painel (via SQL dá erro de login no GoTrue).
-- `business_days.day` único por data — **RESOLVIDO (12/08/2026)**: migration 0020 removeu o UNIQUE(day); agora é possível reabrir o mesmo dia após fechamento (one_open_idx mantém 1 aberto). Aplicado e verificado no banco real.
-- Todos os dados atuais (pedidos/dia) são de TESTE — na operação real será aberto um novo dia.
-- Dependência `sharp` é devOnly (usada apenas para gerar ícones) — não afeta produção/custo.
+- Usuários devem ser criados SEMPRE pelo painel Supabase (via SQL dá erro no GoTrue).
+- Dados de teste no banco podem ser limpos ao iniciar operação real.
+- Dependência `sharp` é devOnly (ícones PWA) — não afeta produção/custo.
 ```
 
 ---

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { addPaymentAction } from "@/lib/auth/cashier";
-import BackButton from "@/components/back-button";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import PageShell from "@/components/page-shell";
+import { addPaymentsAction } from "@/lib/auth/cashier";
+import { closeDay } from "@/lib/auth/close-day";
+import { formatMoneyInput, parseMoney } from "@/lib/money";
 
 interface CashierProps {
   dayId: string;
@@ -18,18 +21,70 @@ interface CashierProps {
   }[];
 }
 
+interface StockRow {
+  product_id: number;
+  product_name: string;
+  initial_qty: number;
+  sold_qty: number;
+  expected_remaining: number;
+  final_counted_qty: number | null;
+}
+
 const fmtBRL = (v: number | string) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v));
 
-/** Painel do caixa: resumo financeiro + receber pedidos + conferência. */
-export default function CashierPanel({ closeout, closeoutError, pendingOrders, dayId, day }: CashierProps) {
+const fmtDayShort = (dayStr: string) => {
+  const [year, month, dayNum] = dayStr.split("-");
+  if (!year || !month || !dayNum) return dayStr;
+  return `${dayNum.padStart(2, "0")}/${month.padStart(2, "0")}/${year.slice(-2)}`;
+};
+
+type PayMethod = "dinheiro" | "pix" | "cartao";
+
+interface PaymentLine {
+  id: string;
+  method: PayMethod;
+  amount: string;
+  change: string;
+}
+
+const lineLiquid = (line: PaymentLine) => {
+  const amount = parseMoney(line.amount);
+  const change = line.method === "dinheiro" ? parseMoney(line.change) : 0;
+  return Math.max(0, amount - change);
+};
+
+const newPaymentLine = (method: PayMethod = "dinheiro", amount = ""): PaymentLine => ({
+  id: crypto.randomUUID(),
+  method,
+  amount,
+  change: "",
+});
+
+/** Painel do caixa: receber → resumo → conferência → encerrar dia. */
+export default function CashierPanel({
+  closeout,
+  closeoutError,
+  pendingOrders,
+  dayId,
+  day,
+}: CashierProps) {
+  const router = useRouter();
   const [paymentFor, setPaymentFor] = useState<string | null>(null);
-  const [method, setMethod] = useState<"dinheiro" | "pix" | "cartao">("dinheiro");
-  const [amount, setAmount] = useState("");
-  const [change, setChange] = useState("");
+  const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [countedCash, setCountedCash] = useState("");
+  const [countedCash, setCountedCash] = useState(() => {
+    const pm0 = (closeout?.payments_by_method as Record<string, number> | undefined) ?? {};
+    const exp =
+      closeout?.expected_cash != null
+        ? Number(closeout.expected_cash)
+        : Number(closeout?.initial_cash ?? 0) + Number(pm0.dinheiro ?? 0);
+    return formatMoneyInput(exp);
+  });
+  const [stockCounted, setStockCounted] = useState<Record<number, number>>({});
   const [pending, setPending] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
   const pm = (closeout?.payments_by_method as Record<string, number> | undefined) ?? {};
   const initialCash = Number(closeout?.initial_cash ?? 0);
@@ -38,200 +93,244 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
   const pixCash = Number(pm.pix ?? 0);
   const cardCash = Number(pm.cartao ?? 0);
   const expectedCash = Number(closeout?.expected_cash ?? initialCash + cashCash);
+  const stock: StockRow[] = useMemo(
+    () => (closeout?.stock as StockRow[] | undefined) ?? [],
+    [closeout]
+  );
 
-  // Conferência
-  const counted = Number(countedCash.replace(/\./g, "").replace(",", ".")) || 0;
+  const counted = parseMoney(countedCash);
   const difference = counted - expectedCash;
+  const cashFieldEmpty = countedCash.trim() === "";
+  const cashOk = !cashFieldEmpty && difference === 0;
 
   const openPayment = (id: string, total: number) => {
     setPaymentFor(id);
-    setMethod("dinheiro");
-    setAmount(String(total));
+    setPaymentLines([newPaymentLine("dinheiro", formatMoneyInput(total))]);
     setError(null);
-    setChange("");
   };
 
+  const closePayment = () => {
+    setPaymentFor(null);
+    setPaymentLines([]);
+    setError(null);
+  };
+
+  const updatePaymentLine = (id: string, patch: Partial<PaymentLine>) => {
+    setPaymentLines((prev) =>
+      prev.map((line) => (line.id === id ? { ...line, ...patch } : line))
+    );
+  };
+
+  const addPaymentLine = (orderTotal: number) => {
+    setPaymentLines((prev) => {
+      const received = prev.reduce((sum, line) => sum + lineLiquid(line), 0);
+      const remaining = Math.max(0, orderTotal - received);
+      const nextMethod: PayMethod = prev.some((line) => line.method === "pix")
+        ? "dinheiro"
+        : "pix";
+      return [...prev, newPaymentLine(nextMethod, remaining > 0 ? formatMoneyInput(remaining) : "")];
+    });
+  };
+
+  const removePaymentLine = (id: string) => {
+    setPaymentLines((prev) => (prev.length <= 1 ? prev : prev.filter((line) => line.id !== id)));
+  };
+
+  const setCountedQty = (id: number, v: number) =>
+    setStockCounted((prev) => ({ ...prev, [id]: v }));
+
   return (
-    <div className="space-y-5 pb-10">
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Caixa</h1>
-          <p className="text-sm text-neutral-500">Dia {day}</p>
-        </div>
-      </header>
+    <PageShell title="Caixa" subtitle={`Dia ${fmtDayShort(day)}`} className="pb-10">
+      {closeoutError && <p className="sk-alert-error">{closeoutError}</p>}
 
-      {closeoutError && (
-        <p className="rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{closeoutError}</p>
-      )}
-
-      {/* Resumo financeiro */}
+      {/* 1. Receber */}
       <section className="sk-card p-4">
-        <h2 className="sk-section-title mb-3">Resumo do caixa</h2>
-        <dl className="space-y-2">
-          <Row label="Caixa inicial" value={fmtBRL(initialCash)} />
-          <Row label="Vendas em dinheiro" value={fmtBRL(cashCash)} />
-          <Row label="Vendas via Pix" value={fmtBRL(pixCash)} />
-          <Row label="Vendas via cartão" value={fmtBRL(cardCash)} />
-          <Row label="Total vendido" value={fmtBRL(totalSales)} strong />
-        </dl>
-        <div className="mt-3 rounded-xl bg-gradient-to-br from-[#eef4ff] to-[#e0ebff] px-4 py-3 ring-1 ring-[#2e54c9]/10">
-          <p className="text-sm font-bold uppercase tracking-wide text-[#2844a8]">Dinheiro esperado</p>
-          <p className="sk-figure mt-0.5 text-2xl text-[#1f3a8c]">{fmtBRL(expectedCash)}</p>
-          <p className="text-xs text-[#2e54c9]/80">caixa inicial + vendas em dinheiro</p>
-        </div>
-      </section>
-
-      {/* Conferência */}
-      <section className="sk-card p-4">
-        <h2 className="sk-section-title mb-3">Conferência</h2>
-        <label className="mb-1 block text-sm font-semibold text-neutral-700">Dinheiro contado</label>
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-neutral-500">R$</span>
-          <input
-            value={countedCash}
-            onChange={(e) => setCountedCash(e.target.value)}
-            inputMode="decimal"
-            placeholder="0,00"
-            className="sk-input h-12 text-2xl font-bold tabular-nums"
-          />
-        </div>
-        <div
-          className={`mt-3 rounded-xl px-4 py-3 ${
-            counted === 0 ? "bg-neutral-50" : difference === 0 ? "bg-green-50" : "bg-red-50"
-          }`}
-        >
-          <p className={`text-sm font-bold ${difference === 0 ? "text-green-700" : "text-red-700"}`}>
-            {counted === 0
-              ? "Informe o dinheiro contado"
-              : difference === 0
-                ? "🟢 CAIXA CONFERIDO"
-                : `🔴 DIFERENÇA DE ${fmtBRL(Math.abs(difference))}`}
-          </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Contado {fmtBRL(counted)} · Esperado {fmtBRL(expectedCash)}
-            {difference !== 0 && counted !== 0 && ` (${difference > 0 ? "sobra" : "falta"} de ${fmtBRL(Math.abs(difference))})`}
-          </p>
-        </div>
-        <p className="mt-2 text-xs text-neutral-400">
-          O resultado da conferência será registrado no fechamento.
-        </p>
-      </section>
-
-      {/* Pedidos a receber */}
-      <section className="sk-card p-4">
-        <h2 className="sk-section-title mb-3">
-          Receber ({pendingOrders.length})
-        </h2>
+        <h2 className="sk-section-title mb-3">Receber ({pendingOrders.length})</h2>
 
         {pendingOrders.length === 0 && (
-          <p className="rounded-xl bg-neutral-50 py-6 text-center text-sm text-neutral-400">
-            Nenhum pedido pendente de pagamento.
-          </p>
+          <p className="sk-empty">Nenhum pedido pendente de pagamento.</p>
         )}
 
         <ul className="space-y-2">
           {pendingOrders.map((o) => (
-            <li key={o.id} className="rounded-xl border border-neutral-200 bg-white p-3 shadow-[0_1px_2px_rgb(23_25_35_/0.04)]">
+            <li key={o.id} className="sk-list-row p-3">
               {paymentFor === o.id ? (
-                <form
-                  className="space-y-3"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setPending(true);
-                    const fd = new FormData(e.currentTarget);
-                    const res = await addPaymentAction(fd);
-                    setError(res.error ?? null);
-                    if (!res.error) {
-                      setPaymentFor(null);
-                      setAmount("");
-                      setChange("");
-                    }
-                    setPending(false);
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-base font-bold text-neutral-900">
-                      #{o.number} · {o.customer_name ?? "Cliente"}
-                    </p>
-                    <p className="text-lg font-black">{fmtBRL(o.total)}</p>
-                  </div>
+                (() => {
+                  const receivedTotal = paymentLines.reduce(
+                    (sum, line) => sum + lineLiquid(line),
+                    0
+                  );
+                  const remaining = o.total - receivedTotal;
+                  const canSubmit =
+                    paymentLines.length > 0 &&
+                    paymentLines.every((line) => parseMoney(line.amount) > 0) &&
+                    Math.abs(remaining) < 0.01;
 
-                  {/* Forma */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {(
-                      [
-                        ["dinheiro", "Dinheiro"],
-                        ["pix", "Pix"],
-                        ["cartao", "Cartão"],
-                      ] as const
-                    ).map(([v, label]) => (
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-base font-bold text-neutral-900">
+                          #{o.number} · {o.customer_name ?? "Cliente"}
+                        </p>
+                        <p className="text-lg font-black">{fmtBRL(o.total)}</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {paymentLines.map((line, index) => (
+                          <div
+                            key={line.id}
+                            className="rounded-xl border border-neutral-200 bg-neutral-50/80 p-3"
+                          >
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <p className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+                                Pagamento {index + 1}
+                              </p>
+                              {paymentLines.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removePaymentLine(line.id)}
+                                  className="text-xs font-semibold text-red-600"
+                                >
+                                  Remover
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                              {(
+                                [
+                                  ["dinheiro", "Dinheiro"],
+                                  ["pix", "Pix"],
+                                  ["cartao", "Cartão"],
+                                ] as const
+                              ).map(([value, label]) => (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() =>
+                                    updatePaymentLine(line.id, {
+                                      method: value,
+                                      change: value === "dinheiro" ? line.change : "",
+                                    })
+                                  }
+                                  className={`sk-method-chip ${
+                                    line.method === value ? "sk-method-chip--active" : ""
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className="text-lg font-bold text-neutral-500">R$</span>
+                              <input
+                                value={line.amount}
+                                onChange={(e) =>
+                                  updatePaymentLine(line.id, { amount: e.target.value })
+                                }
+                                inputMode="decimal"
+                                placeholder="0,00"
+                                className="sk-input h-11 flex-1 text-lg font-bold tabular-nums"
+                              />
+                            </div>
+
+                            {line.method === "dinheiro" && (
+                              <div className="mt-2">
+                                <label className="mb-1 block text-sm text-neutral-600">
+                                  Troco para R$
+                                </label>
+                                <input
+                                  value={line.change}
+                                  onChange={(e) =>
+                                    updatePaymentLine(line.id, { change: e.target.value })
+                                  }
+                                  inputMode="decimal"
+                                  placeholder="0,00"
+                                  className="sk-input h-11 w-full text-base font-bold tabular-nums"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
                       <button
-                        key={v}
                         type="button"
-                        onClick={() => {
-                          setMethod(v);
-                          setAmount(String(o.total));
-                        }}
-                        className={`rounded-lg border px-2 py-2 text-sm font-bold ${
-                          method === v ? "border-blue-600 bg-blue-50 text-blue-700" : "border-neutral-200 text-neutral-600"
-                        }`}
+                        onClick={() => addPaymentLine(o.total)}
+                        disabled={paymentLines.length >= 3}
+                        className="w-full rounded-xl border border-dashed border-primary-300 bg-primary-50/50 py-2.5 text-sm font-bold text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {label}
+                        + Outra forma de pagamento
                       </button>
-                    ))}
-                  </div>
 
-                  <input type="hidden" name="order_id" value={o.id} />
-                  <input type="hidden" name="method" value={method} />
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-neutral-500">R$</span>
-                    <input
-                      name="amount"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      inputMode="decimal"
-                      className="h-11 flex-1 rounded-lg border border-neutral-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div
+                        className={
+                          canSubmit
+                            ? "sk-alert-success py-2.5"
+                            : remaining > 0
+                              ? "sk-alert-warn py-2.5"
+                              : "sk-alert-error py-2.5"
+                        }
+                      >
+                        {canSubmit ? (
+                          <p className="font-semibold">Total conferido · pronto para registrar</p>
+                        ) : remaining > 0 ? (
+                          <p className="font-semibold">
+                            Falta {fmtBRL(remaining)} para quitar o pedido
+                          </p>
+                        ) : (
+                          <p className="font-semibold">
+                            Valor excede o total em {fmtBRL(Math.abs(remaining))}
+                          </p>
+                        )}
+                        <p className="mt-0.5 text-xs opacity-80">
+                          Recebido {fmtBRL(receivedTotal)} de {fmtBRL(o.total)}
+                        </p>
+                      </div>
 
-                  {method === "dinheiro" && (
-                    <label className="flex items-center gap-2 text-sm text-neutral-600">
-                      Troco para R$
-                    </label>
-                  )}
-                  {method === "dinheiro" && (
-                    <input
-                      name="change_given"
-                      value={change}
-                      onChange={(e) => setChange(e.target.value)}
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      className="h-11 w-full rounded-lg border border-neutral-300 px-3 text-base font-bold outline-none focus:border-blue-500"
-                    />
-                  )}
+                      {error && <p className="sk-alert-error">{error}</p>}
 
-                  {error && (
-                    <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>
-                  )}
-
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={pending}
-                      className="flex-1 rounded-lg bg-green-600 py-3 text-base font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {pending ? "Registrando…" : "REGISTRAR PAGAMENTO"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentFor(null)}
-                      className="rounded-lg border border-neutral-300 px-4 text-sm font-bold text-neutral-600"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
+                      <div className="flex items-stretch gap-2">
+                        <button
+                          type="button"
+                          disabled={pending || !canSubmit}
+                          onClick={async () => {
+                            if (!canSubmit || pending) return;
+                            setPending(true);
+                            setError(null);
+                            const res = await addPaymentsAction(
+                              o.id,
+                              paymentLines.map((line) => ({
+                                method: line.method,
+                                amount: parseMoney(line.amount),
+                                change_given:
+                                  line.method === "dinheiro" ? parseMoney(line.change) : 0,
+                              }))
+                            );
+                            setError(res.error ?? null);
+                            if (!res.error) {
+                              closePayment();
+                              router.refresh();
+                            }
+                            setPending(false);
+                          }}
+                          className="sk-btn-success min-h-[3.25rem] flex-1 rounded-xl py-3 text-sm font-bold tracking-wide"
+                        >
+                          {pending ? "Registrando…" : "Registrar pagamento"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={closePayment}
+                          disabled={pending}
+                          className="sk-btn-secondary min-h-[3.25rem] shrink-0 rounded-xl px-5 py-3 text-sm font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -245,7 +344,7 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
                     <button
                       type="button"
                       onClick={() => openPayment(o.id, o.total)}
-                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white"
+                      className="sk-btn-primary sk-btn-sm"
                     >
                       Receber
                     </button>
@@ -256,15 +355,188 @@ export default function CashierPanel({ closeout, closeoutError, pendingOrders, d
           ))}
         </ul>
       </section>
-    </div>
+
+      {/* 2. Resumo do caixa */}
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">Resumo do caixa</h2>
+        <dl className="space-y-2">
+          <Row label="Caixa inicial" value={fmtBRL(initialCash)} />
+          <Row label="Vendas em dinheiro" value={fmtBRL(cashCash)} />
+          <Row label="Vendas via Pix" value={fmtBRL(pixCash)} />
+          <Row label="Vendas via cartão" value={fmtBRL(cardCash)} />
+          <Row label="Total vendido" value={fmtBRL(totalSales)} strong />
+        </dl>
+        <div className="sk-highlight-primary">
+          <p className="text-sm font-bold uppercase tracking-wide text-primary-700">
+            Dinheiro esperado
+          </p>
+          <p className="sk-figure mt-0.5 text-2xl text-primary-800">{fmtBRL(expectedCash)}</p>
+          <p className="text-xs text-primary-600/80">caixa inicial + vendas em dinheiro</p>
+        </div>
+      </section>
+
+      {/* 3. Conferência */}
+      <section className="sk-card p-4">
+        <h2 className="sk-section-title mb-3">Conferência</h2>
+        <label className="mb-1 block text-sm font-semibold text-neutral-700">
+          Dinheiro contado
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-bold text-neutral-500">R$</span>
+          <input
+            value={countedCash}
+            onChange={(e) => setCountedCash(e.target.value)}
+            inputMode="decimal"
+            placeholder="0,00"
+            className="sk-input h-12 text-2xl font-bold tabular-nums"
+          />
+        </div>
+        <div
+          className={`mt-3 rounded-xl px-4 py-3 ${
+            cashFieldEmpty ? "bg-neutral-50" : cashOk ? "bg-success-50" : "bg-danger-50"
+          }`}
+        >
+          <p
+            className={`text-sm font-bold ${
+              cashFieldEmpty
+                ? "text-neutral-600"
+                : cashOk
+                  ? "text-success-600"
+                  : "text-danger-600"
+            }`}
+          >
+            {cashFieldEmpty
+              ? "Informe o dinheiro contado"
+              : cashOk
+                ? "CAIXA CONFERIDO"
+                : `DIFERENÇA DE ${fmtBRL(Math.abs(difference))}`}
+          </p>
+          <p className="mt-1 text-xs text-neutral-500">
+            Contado {fmtBRL(counted)} · Esperado {fmtBRL(expectedCash)}
+            {!cashOk &&
+              !cashFieldEmpty &&
+              ` (${difference > 0 ? "sobra" : "falta"} de ${fmtBRL(Math.abs(difference))})`}
+          </p>
+        </div>
+      </section>
+
+      {/* 4. Encerrar dia */}
+      <section className="sk-card overflow-hidden p-0">
+        <div className="border-b border-neutral-100 px-4 py-3">
+          <h2 className="sk-section-title">Encerrar dia</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Confira o estoque físico e encerre a operação do dia.
+          </p>
+        </div>
+
+        <div className="space-y-4 px-4 py-4">
+          {pendingOrders.length > 0 && (
+            <p className="sk-alert-warn">
+              Quite todos os pedidos pendentes antes de encerrar o dia.
+            </p>
+          )}
+
+          {stock.length === 0 ? (
+            <p className="text-sm text-neutral-400">Nenhum produto com estoque neste dia.</p>
+          ) : (
+            <ul className="space-y-3">
+              {stock.map((s) => {
+                const countedQty = stockCounted[s.product_id] ?? s.expected_remaining;
+                const itemDiff = countedQty - s.expected_remaining;
+                return (
+                  <li key={s.product_id} className="sk-list-row p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-sm font-semibold text-neutral-900">
+                        {s.product_name}
+                      </p>
+                      {itemDiff !== 0 && (
+                        <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                          dif: {itemDiff > 0 ? "+" : ""}
+                          {itemDiff}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-500">
+                      inicial {s.initial_qty} · vendido {s.sold_qty} · esperado{" "}
+                      {s.expected_remaining}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs font-semibold text-neutral-600">Contado:</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={countedQty}
+                        onChange={(e) => setCountedQty(s.product_id, Number(e.target.value))}
+                        className="sk-qty-input h-10 w-20"
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {closeError && (
+            <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {closeError}
+            </p>
+          )}
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setClosing(true);
+              setCloseError(null);
+              const fd = new FormData(e.currentTarget);
+              const res = await closeDay(fd);
+              if (res?.error) {
+                setCloseError(res.error);
+                setClosing(false);
+              }
+            }}
+          >
+            <input type="hidden" name="day_id" value={dayId} />
+            <input type="hidden" name="counted_cash" value={countedCash} />
+            {stock.map((s) => (
+              <input key={s.product_id} type="hidden" name="product_id" value={s.product_id} />
+            ))}
+            {stock.map((s) => (
+              <input
+                key={`q-${s.product_id}`}
+                type="hidden"
+                name="counted_qty"
+                value={stockCounted[s.product_id] ?? s.expected_remaining}
+              />
+            ))}
+            <input type="hidden" name="notes" value="" />
+            <button
+              type="submit"
+              disabled={closing || pendingOrders.length > 0 || cashFieldEmpty || counted < 0}
+              className="sk-btn-dark w-full rounded-2xl py-4"
+            >
+              {closing ? "Encerrando…" : "Confirmar e encerrar dia"}
+            </button>
+            <p className="mt-2 text-center text-xs text-neutral-400">
+              Ao confirmar, o dia será bloqueado e não aceitará novos pedidos.
+            </p>
+          </form>
+        </div>
+      </section>
+    </PageShell>
   );
 }
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <dt className={strong ? "text-sm font-bold text-neutral-900" : "text-sm text-neutral-600"}>{label}</dt>
-      <dd className={`${strong ? "text-lg font-black" : "text-sm font-semibold"} text-neutral-900`}>{value}</dd>
+      <dt className={strong ? "text-sm font-bold text-neutral-900" : "text-sm text-neutral-600"}>
+        {label}
+      </dt>
+      <dd
+        className={`${strong ? "text-lg font-black" : "text-sm font-semibold"} text-neutral-900`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

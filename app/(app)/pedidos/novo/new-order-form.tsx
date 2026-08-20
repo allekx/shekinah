@@ -2,9 +2,11 @@
 
 import { useActionState, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import PageShell from "@/components/page-shell";
 import { createOrderAction, type CreateOrderResult } from "@/lib/auth/orders";
+import { getPrinterSettings } from "@/lib/auth/printer-settings";
 import { printOrderReceipt, type PrintOrderData } from "@/lib/printing/print";
-import BackButton from "@/components/back-button";
+import { toPrintSettings } from "@/lib/printing/settings";
 
 interface Product {
   id: number;
@@ -22,8 +24,8 @@ const fmtBRL = (v: number) =>
   }).format(v);
 
 /** Tela de NOVO PEDIDO (atendimento) — mobile-first.
- *  Produtos por categoria, botões grandes, total em tempo real,
- *  forma de pagamento e FINALIZAR (atômico no banco).
+ *  Produtos por categoria, botões grandes, total em tempo real.
+ *  Pedido fica aberto em comanda; recebimento só no caixa.
  */
 export default function NewOrderForm({
   dayId,
@@ -36,8 +38,6 @@ export default function NewOrderForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [customer, setCustomer] = useState("");
   const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [paymentMethod, setPaymentMethod] = useState<"" | "dinheiro" | "pix" | "cartao">("");
-  const [paymentAmount, setPaymentAmount] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const [printPreview, setPrintPreview] = useState<import("@/lib/printing/types").ReceiptPreview | null>(null);
@@ -55,6 +55,30 @@ export default function NewOrderForm({
     }
     return map;
   }, [products]);
+
+  const sortedCategories = useMemo(() => {
+    const categoryRank = (category: string) => {
+      const name = category.toLowerCase();
+      if (name === "pratos") return 0;
+      if (name === "porções" || name === "porcoes") return 1;
+      if (name === "bebidas") return 2;
+      if (name === "sobremesas") return 3;
+      return 4;
+    };
+    return Object.entries(byCategory).sort(([a], [b]) => {
+      const diff = categoryRank(a) - categoryRank(b);
+      if (diff !== 0) return diff;
+      return a.localeCompare(b, "pt-BR");
+    });
+  }, [byCategory]);
+
+  const parseQtyInput = (raw: string, max: number | null) => {
+    const digits = raw.replace(/\D/g, "");
+    if (digits === "") return 0;
+    const num = Number(digits);
+    if (max !== null) return Math.min(num, max);
+    return num;
+  };
 
   // Total e itens selecionados
   const { selectedItems, total } = useMemo(() => {
@@ -100,7 +124,8 @@ export default function NewOrderForm({
         })),
         total: total,
       };
-      const result = await printOrderReceipt(receipt);
+      const printSettings = toPrintSettings(await getPrinterSettings());
+      const result = await printOrderReceipt(receipt, printSettings);
       setPrintPreview(result.preview);
       if (!result.ok) setPrintError(result.error ?? "Falha de impressão.");
       // aguarda o usuário confirmar (modal) antes de voltar
@@ -115,14 +140,7 @@ export default function NewOrderForm({
   };
 
   return (
-    <div className="space-y-5 pb-24">
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Novo pedido</h1>
-        </div>
-      </header>
-
+    <PageShell title="Novo pedido" className="sk-page-with-sticky-footer">
       <form ref={formRef} action={formAction} className="space-y-5">
         {/* Nome do cliente */}
         <section className="sk-card p-4">
@@ -139,7 +157,7 @@ export default function NewOrderForm({
         </section>
 
         {/* Produtos por categoria */}
-        {Object.entries(byCategory).map(([category, list]) => (
+        {sortedCategories.map(([category, list]) => (
           <section key={category} className="sk-card p-4">
             <h2 className="sk-section-title mb-3">
               {category}
@@ -151,11 +169,7 @@ export default function NewOrderForm({
                 return (
                   <li
                     key={p.id}
-                    className={`rounded-xl border px-3 py-2 ${
-                      soldOut
-                        ? "border-neutral-200 bg-neutral-50 opacity-60"
-                        : "border-neutral-200"
-                    }`}
+                    className={`sk-list-row px-3 py-2 ${soldOut ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -167,7 +181,7 @@ export default function NewOrderForm({
                           {p.available !== null && (
                             <span className="ml-2 text-xs">
                               {soldOut ? (
-                                <span className="font-bold text-red-500">ESGOTADO</span>
+                                <span className="sk-badge sk-badge--danger ml-1">ESGOTADO</span>
                               ) : (
                                 <>Disponível: {p.available}</>
                               )}
@@ -181,18 +195,22 @@ export default function NewOrderForm({
                           <button
                             type="button"
                             onClick={() => setQty(p.id, Math.max(0, n - 1))}
-                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-xl font-bold text-neutral-700 active:bg-neutral-200"
+                            className="sk-qty-btn"
                             aria-label={`Diminuir ${p.name}`}
                           >
                             −
                           </button>
                           <input
-                            type="number"
+                            type="text"
                             inputMode="numeric"
+                            pattern="[0-9]*"
                             name="quantity"
-                            value={n}
-                            onChange={(e) => setQty(p.id, Number(e.target.value) || 0)}
-                            className="h-10 w-14 rounded-lg border border-neutral-300 text-center text-lg font-bold"
+                            value={n === 0 ? "" : String(n)}
+                            placeholder="0"
+                            onChange={(e) =>
+                              setQty(p.id, parseQtyInput(e.target.value, p.available))
+                            }
+                            className="sk-qty-input w-14"
                           />
                           <button
                             type="button"
@@ -204,7 +222,7 @@ export default function NewOrderForm({
                                   : n + 1
                               )
                             }
-                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-xl font-bold text-neutral-700 active:bg-neutral-200"
+                            className="sk-qty-btn"
                             aria-label={`Aumentar ${p.name}`}
                           >
                             +
@@ -223,7 +241,7 @@ export default function NewOrderForm({
 
         {/* Resumo do pedido */}
         {selectedItems.length > 0 && (
-          <section className="rounded-[1rem] bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 p-4 text-white shadow-[0_10px_24px_rgb(23_25_35_/0.15)]">
+          <section className="sk-summary-dark">
             <div className="space-y-1">
               {selectedItems.map((it) => {
                 const p = products.find((x) => x.id === it.product_id);
@@ -249,112 +267,43 @@ export default function NewOrderForm({
           </section>
         )}
 
-        {/* Forma de pagamento */}
-        <section className="sk-card p-4">
-          <h2 className="sk-section-title mb-3">
-            Pagamento
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                ["dinheiro", "Dinheiro"],
-                ["pix", "Pix"],
-                ["cartao", "Cartão"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => {
-                  setPaymentMethod(value);
-                  // pré-preenche o valor com o total
-                  setPaymentAmount(String(total));
-                }}
-                className={`rounded-xl border px-3 py-3 text-base font-bold ${
-                  paymentMethod === value
-                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-neutral-200 text-neutral-600"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {paymentMethod && (
-            <div className="mt-3 space-y-3">
-              <label className="block text-sm font-semibold text-neutral-700">
-                Valor recebido do cliente (R$)
-              </label>
-              <input
-                name="payment_amount"
-                type="number"
-                inputMode="decimal"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                className="sk-input text-2xl font-bold tabular-nums"
-              />
-
-              {paymentMethod === "dinheiro" && (() => {
-                const received = Number(paymentAmount) || 0;
-                const change = Math.max(0, received - total);
-                return (
-                  <>
-                    <input type="hidden" name="change_given" value={change} />
-                    {received > total ? (
-                      <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
-                        Troco a devolver: {fmtBRL(change)}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-neutral-400">
-                        Se o cliente entregar mais que {fmtBRL(total)}, informe o valor e o troco é calculado.
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </section>
-
         <input type="hidden" name="day_id" value={dayId} />
 
         {/* Estado de erro da action */}
         {state?.error && !pending && (
-          <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p role="alert" className="sk-alert-error">
             {state.error}
           </p>
         )}
-
-        {/* Botão FINALIZAR (protegido contra duplo toque) */}
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-neutral-200 bg-white p-4">
-          <div className="mx-auto max-w-md">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit || pending || submitted}
-              className="w-full rounded-[1rem] bg-gradient-to-b from-[#16a34a] to-[#12853b] py-5 text-center text-lg font-extrabold tracking-tight text-white shadow-lg shadow-[#16a34a]/25 transition hover:from-[#179a47] hover:to-[#0f7a36] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {pending ? "Enviando…" : submitted ? "Processando…" : "FINALIZAR PEDIDO"}
-            </button>
-            <p className="mt-2 text-center text-xs text-neutral-400">
-              {canSubmit
-                ? "Ao finalizar, o pedido é enviado à cozinha."
-                : "Selecione itens para finalizar"}
-            </p>
-          </div>
-        </div>
       </form>
+
+      <div className="sk-sticky-footer">
+        <div className="sk-sticky-footer__inner">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit || pending || submitted}
+            className="sk-btn-success w-full py-5 text-lg"
+          >
+            {pending ? "Enviando…" : submitted ? "Processando…" : "FINALIZAR PEDIDO"}
+          </button>
+          <p className="mt-2 text-center text-xs sk-text-muted">
+            {canSubmit
+              ? "Ao finalizar, a comanda vai para a cozinha. Pagamento no caixa."
+              : "Selecione itens para finalizar"}
+          </p>
+        </div>
+      </div>
 
       {/* Confirmação do pedido + comanda (impressão DESACOPLADA) */}
       {state?.orderId && printPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="sk-card sk-card--elevated w-full max-w-sm overflow-hidden">
             <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
               <p className="text-sm font-bold text-neutral-800">
                 {printError ? "⚠️ Pedido salvo, impressão falhou" : "✅ Pedido salvo · comanda"}
               </p>
-              <span className="rounded-lg bg-neutral-900 px-2 py-1 text-xs font-bold text-white">#{state.orderNumber}</span>
+              <span className="sk-badge sk-badge--neutral px-2 py-1 text-xs">#{state.orderNumber}</span>
             </div>
 
             {/* Comanda (pré-visualização) */}
@@ -372,7 +321,7 @@ export default function NewOrderForm({
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="w-full rounded-xl bg-green-600 py-3 text-center text-base font-black text-white active:bg-green-700"
+                className="sk-btn-success w-full py-3 text-base"
               >
                 Concluir e voltar ao início
               </button>
@@ -390,11 +339,12 @@ export default function NewOrderForm({
                     })),
                     total: total,
                   };
-                  const result = await printOrderReceipt(receipt);
+                  const printSettings = toPrintSettings(await getPrinterSettings());
+      const result = await printOrderReceipt(receipt, printSettings);
                   if (result.ok) setPrintError(null);
                   else setPrintError(result.error ?? "Falha de impressão.");
                 }}
-                className="w-full rounded-xl border border-neutral-300 py-3 text-center text-sm font-bold text-neutral-700 active:bg-neutral-100"
+                className="sk-btn-secondary w-full py-3"
               >
                 ♻ Reimprimir comanda
               </button>
@@ -402,6 +352,6 @@ export default function NewOrderForm({
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

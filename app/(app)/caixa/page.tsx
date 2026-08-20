@@ -1,5 +1,6 @@
 import { createClient, getRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import PageShell from "@/components/page-shell";
 import CashierPanel from "./cashier-panel";
 
 /** Módulo de CAIXA do dia aberto (somente john). */
@@ -20,12 +21,9 @@ export default async function CaixaPage() {
 
   if (!day) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-bold text-neutral-900">Caixa</h1>
-        <p className="rounded-2xl bg-white p-5 text-center text-sm text-neutral-500 shadow-sm">
-          Nenhum dia aberto. Inicie o dia para operar o caixa.
-        </p>
-      </div>
+      <PageShell title="Caixa">
+        <p className="sk-empty">Nenhum dia aberto. Inicie o dia para operar o caixa.</p>
+      </PageShell>
     );
   }
 

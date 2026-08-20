@@ -56,7 +56,7 @@ function CategoryPicker({
           }}
           onFocus={() => setOpen(true)}
           placeholder="Escolha ou digite uma categoria"
-          className="sk-input pr-10"
+          className="sk-input sk-input--icon-end"
           autoComplete="off"
         />
         <button
@@ -291,9 +291,7 @@ export default function OpenDayAddProduct({
       )}
 
       {success && !open && (
-        <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
-          {success}
-        </p>
+        <p className="mt-3 sk-alert-success">{success}</p>
       )}
     </section>
   );

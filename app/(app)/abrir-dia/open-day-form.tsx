@@ -1,8 +1,8 @@
 ﻿"use client";
 
 import { useActionState, useState } from "react";
+import PageShell from "@/components/page-shell";
 import { openDay, type OpenDayResult } from "@/lib/auth/open-day";
-import BackButton from "@/components/back-button";
 import OpenDayAddProduct from "./open-day-add-product";
 
 interface Product {
@@ -63,17 +63,7 @@ export default function OpenDayForm({
   });
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Iniciar dia</h1>
-          <p className="text-sm text-neutral-500">
-            Informe o estoque inicial e o caixa inicial.
-          </p>
-        </div>
-      </header>
-
+    <PageShell title="Iniciar dia" subtitle="Informe o estoque inicial e o caixa inicial.">
       <form action={formAction} className="space-y-6">
         {/* Grade de estoque por categoria */}
         {sortedCategories.map(([category, list]) => (
@@ -85,7 +75,7 @@ export default function OpenDayForm({
               {list.map((p) => (
                 <li
                   key={p.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 px-3 py-2"
+                  className="sk-list-row flex items-center justify-between gap-3 px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-neutral-900">
@@ -100,7 +90,7 @@ export default function OpenDayForm({
                     <button
                       type="button"
                       onClick={() => setQty(p.id, qty(p.id) - 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-xl font-bold text-neutral-700 active:bg-neutral-200"
+                      className="sk-qty-btn h-9 w-9"
                       aria-label={`Diminuir ${p.name}`}
                     >
                       −
@@ -113,12 +103,12 @@ export default function OpenDayForm({
                       onChange={(e) =>
                         setQty(p.id, Number(e.target.value) || 0)
                       }
-                      className="h-9 w-14 rounded-lg border border-neutral-300 text-center text-base font-bold text-neutral-900 outline-none focus:border-blue-500"
+                      className="sk-qty-input h-9 w-14"
                     />
                     <button
                       type="button"
                       onClick={() => setQty(p.id, qty(p.id) + 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-xl font-bold text-neutral-700 active:bg-neutral-200"
+                      className="sk-qty-btn h-9 w-9"
                       aria-label={`Aumentar ${p.name}`}
                     >
                       +
@@ -148,16 +138,13 @@ export default function OpenDayForm({
               value={cash}
               onChange={(e) => setCash(e.target.value)}
               placeholder="0,00"
-              className="h-12 w-full rounded-xl border border-neutral-300 px-4 text-2xl font-bold text-neutral-900 outline-none focus:border-blue-500"
+              className="sk-input h-12 text-2xl font-bold tabular-nums"
             />
           </div>
         </section>
 
         {state?.error && (
-          <p
-            role="alert"
-            className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-          >
+          <p role="alert" className="sk-alert-error">
             {state.error}
           </p>
         )}
@@ -165,15 +152,15 @@ export default function OpenDayForm({
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-2xl bg-blue-600 py-4 text-lg font-bold text-white transition active:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="sk-btn-primary w-full py-4 text-lg"
         >
           {pending ? "Abrindo…" : "CONFIRMAR ABERTURA"}
         </button>
 
-        <p className="text-center text-xs text-neutral-400">
+        <p className="text-center text-xs sk-text-muted">
           Não é possível abrir outro dia enquanto houver um dia aberto.
         </p>
       </form>
-    </div>
+    </PageShell>
   );
 }

@@ -1,10 +1,11 @@
 ﻿"use client";
 
 import { useMemo } from "react";
-import { buildCloseoutReceipt } from "@/lib/printing/receipts";
-import { PrintPreviewButton } from "@/components/print/print-preview-modal";
-import BackButton from "@/components/back-button";
-import type { ReceiptPreview } from "@/lib/printing/types";
+import PageShell from "@/components/page-shell";
+import PrintReceiptButton from "@/components/print/print-receipt-button";
+import { getPrinterSettings } from "@/lib/auth/printer-settings";
+import { printCloseoutReceipt } from "@/lib/printing/print";
+import { toPrintSettings } from "@/lib/printing/settings";
 
 interface Props {
   day: {
@@ -38,60 +39,46 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
     | { product_name: string; initial_qty: number; sold_qty: number; expected_remaining: number; final_counted_qty: number | null }[]
     | undefined) ?? [];
 
-  // Constrói a pré-visualização do relatório térmico usando a camada de impressão
-  const preview: ReceiptPreview | null = useMemo(() => {
+  const closeoutPrintData = useMemo(() => {
     if (!closeout) return null;
-    return buildCloseoutReceipt(
-      {
-        day: day.day,
-        opened_at: day.opened_at,
-        closed_at: day.closed_at,
-        opened_by: day.opened_by,
-        closed_by: day.opened_by,
-        orders_total: Number(closeout.orders_total ?? 0),
-        total_sales: Number(closeout.total_sales ?? 0),
-        payments: {
-          dinheiro: Number(pm.dinheiro ?? 0),
-          pix: Number(pm.pix ?? 0),
-          cartao: Number(pm.cartao ?? 0),
-        },
-        initial_cash: Number(closeout.initial_cash ?? 0),
-        expected_cash: Number(closeout.expected_cash ?? 0),
-        counted_cash: day.counted_cash,
-        cash_difference: day.cash_difference,
-        stock: stock.map((s) => ({
-          product_name: s.product_name,
-          initial_qty: s.initial_qty,
-          sold_qty: s.sold_qty,
-          expected_remaining: s.expected_remaining,
-          final_counted_qty: s.final_counted_qty,
-        })),
-        status: day.status,
+    return {
+      day: day.day,
+      opened_at: day.opened_at,
+      closed_at: day.closed_at,
+      opened_by: day.opened_by,
+      closed_by: day.opened_by,
+      orders_total: Number(closeout.orders_total ?? 0),
+      total_sales: Number(closeout.total_sales ?? 0),
+      payments: {
+        dinheiro: Number(pm.dinheiro ?? 0),
+        pix: Number(pm.pix ?? 0),
+        cartao: Number(pm.cartao ?? 0),
       },
-      { name: "SHEKINAH", address: undefined }
-    );
+      initial_cash: Number(closeout.initial_cash ?? 0),
+      expected_cash: Number(closeout.expected_cash ?? 0),
+      counted_cash: day.counted_cash,
+      cash_difference: day.cash_difference,
+      stock: stock.map((s) => ({
+        product_name: s.product_name,
+        initial_qty: s.initial_qty,
+        sold_qty: s.sold_qty,
+        expected_remaining: s.expected_remaining,
+        final_counted_qty: s.final_counted_qty,
+      })),
+      status: day.status,
+    };
   }, [closeout, day, pm, stock]);
 
   const diff = day.cash_difference;
 
   return (
-    <div className="space-y-5">
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Relatório do dia</h1>
-          <p className="text-sm text-neutral-500">
-            {new Date(day.day + "T00:00:00").toLocaleDateString("pt-BR")} · somente leitura
-          </p>
-        </div>
-      </header>
+    <PageShell
+      title="Relatório do dia"
+      subtitle={`${new Date(day.day + "T00:00:00").toLocaleDateString("pt-BR")} · somente leitura`}
+    >
+      {closeoutError && <p className="sk-alert-error">{closeoutError}</p>}
 
-      {closeoutError && (
-        <p className="rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-700">{closeoutError}</p>
-      )}
-
-      {/* Cabeçalho */}
-      <section className="rounded-2xl bg-neutral-900 p-5 text-white">
+      <section className="sk-summary-dark">
         <p className="text-sm opacity-80">SHEKINAH</p>
         <p className="text-lg font-black">{day.day}</p>
         <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
@@ -140,10 +127,10 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
       {/* Estoque */}
       <section className="sk-card p-4">
         <h2 className="mb-2 sk-section-title">Estoque</h2>
-        {stock.length === 0 && <p className="text-sm text-neutral-400">Sem produtos com estoque.</p>}
+        {stock.length === 0 && <p className="sk-empty">Sem produtos com estoque.</p>}
         <ul className="space-y-2">
           {stock.map((s) => (
-            <li key={s.product_name} className="rounded-xl border border-neutral-100 px-3 py-2">
+            <li key={s.product_name} className="sk-list-row px-3 py-2">
               <p className="text-sm font-semibold text-neutral-900">{s.product_name}</p>
               <p className="text-xs text-neutral-500">
                 inicial {s.initial_qty} · vendido {s.sold_qty} · esperado {s.expected_remaining} · contado {s.final_counted_qty ?? "-"} · diferença {s.final_counted_qty !== null ? (s.final_counted_qty - s.expected_remaining) : "-"}
@@ -159,13 +146,30 @@ export default function ReportView({ day, openerEmail, closeout, closeoutError }
         <p className="text-base font-black text-neutral-900">{day.status === "fechado" ? "FECHADO" : "ABERTO"}</p>
       </section>
 
-      {/* Impressão */}
-      {preview && (
-        <div className="pb-4">
-          <PrintPreviewButton preview={preview} label="IMPRIMIR RELATÓRIO" />
-        </div>
-      )}
-    </div>
+      {/* Impressão e navegação */}
+      <div className="space-y-3 pb-4">
+        {closeoutPrintData && (
+          <PrintReceiptButton
+            label="IMPRIMIR RELATÓRIO"
+            onPrint={async () => {
+              const config = await getPrinterSettings();
+              return printCloseoutReceipt(closeoutPrintData, toPrintSettings(config));
+            }}
+          />
+        )}
+        <a
+          href="/"
+          className="sk-btn-secondary block w-full py-3.5 text-center"
+        >
+          Voltar ao início
+        </a>
+        {day.status === "fechado" && (
+          <p className="text-center text-xs sk-text-muted">
+            Na tela inicial você pode iniciar um novo dia de operação.
+          </p>
+        )}
+      </div>
+    </PageShell>
   );
 }
 

@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#2563eb"/>
-  <!-- marca d'água 'onda' sutil (igarapé) -->
-  <path d="M0 340 C 96 300, 160 380, 256 340 S 416 300, 512 340 V 512 H 0 Z" fill="#1d4ed8"/>
-  <path d="M0 400 C 96 360, 160 440, 256 400 S 416 360, 512 400 V 512 H 0 Z" fill="#1e40af" opacity="0.5"/>
-  <!-- letra S -->
+  <rect width="512" height="512" rx="96" fill="#FF8A4F"/>
+  <path d="M0 340 C 96 300, 160 380, 256 340 S 416 300, 512 340 V 512 H 0 Z" fill="#E87245"/>
+  <path d="M0 400 C 96 360, 160 440, 256 400 S 416 360, 512 400 V 512 H 0 Z" fill="#D05F38" opacity="0.5"/>
   <text x="256" y="336" font-family="'Segoe UI', Arial, sans-serif" font-size="280" font-weight="800" fill="#ffffff" text-anchor="middle">S</text>
 </svg>

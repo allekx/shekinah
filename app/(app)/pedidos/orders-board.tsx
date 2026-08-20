@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cancelOrderAction } from "@/lib/auth/orders";
+import PageShell from "@/components/page-shell";
 import AddItemsModal from "./add-items-modal";
-import BackButton from "@/components/back-button";
 
 interface OrderItemLite {
   product_name: string;
@@ -116,7 +116,9 @@ export default function OrdersBoard({
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `business_day_id=eq.${dayId}` },
         async (payload) => {
-          const row = payload.new as Partial<Order> | null;
+          const row =
+            (payload.new as Partial<Order> | null) ??
+            (payload.old as Partial<Order> | null);
           if (!row?.id) return;
           const orderId: string = row.id;
 
@@ -125,7 +127,31 @@ export default function OrdersBoard({
             return;
           }
 
-          // refresh do pedido + itens
+          // Atualização rápida de status (cozinha → em preparo / pronto)
+          if (payload.eventType === "UPDATE" && payload.new && "status" in payload.new) {
+            const updated = payload.new as Partial<Order>;
+            setOrders((prev) => {
+              const exists = prev.some((o) => o.id === orderId);
+              if (!exists && updated.status) {
+                return prev;
+              }
+              return prev
+                .map((o) =>
+                  o.id === orderId
+                    ? {
+                        ...o,
+                        status: updated.status ?? o.status,
+                        total: updated.total != null ? Number(updated.total) : o.total,
+                        paid: updated.paid ?? o.paid,
+                        updated_at: updated.updated_at ?? o.updated_at,
+                      }
+                    : o
+                )
+                .sort((a, b) => a.number - b.number);
+            });
+          }
+
+          // refresh completo do pedido + itens
           const { data: fresh } = await supabase
             .from("orders")
             .select("id, number, customer_name, status, total, paid, created_at, updated_at")
@@ -170,20 +196,13 @@ export default function OrdersBoard({
     new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="space-y-5">
+    <PageShell
+      title="Pedidos do dia"
+      subtitle={`${orders.filter((o) => o.status !== "cancelado").length} pedido(s) ativo(s)`}
+    >
       {actionError && (
         <p role="alert" className="sk-alert-error">{actionError}</p>
       )}
-      <header className="flex items-center gap-3">
-        <BackButton />
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">Pedidos do dia</h1>
-          <p className="text-sm text-neutral-500">
-            {orders.filter((o) => o.status !== "cancelado").length} pedido(s) ativo(s)
-          </p>
-        </div>
-      </header>
-
       {/* Modal de adicionar itens (complemento) */}
       {addFor && (
         <AddItemsModal
@@ -197,7 +216,7 @@ export default function OrdersBoard({
         />
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="sk-kanban sk-kanban--4">
         {COLUMNS.map((col) => {
           const list = byStatus(col.key);
           return (
@@ -209,7 +228,7 @@ export default function OrdersBoard({
               </h2>
 
               {list.length === 0 ? (
-                <p className="py-6 text-center text-xs text-neutral-400">—</p>
+                <p className="sk-empty py-6 text-xs">—</p>
               ) : (
                 <ul className="space-y-2">
                   {list.map((o) => (
@@ -302,6 +321,6 @@ export default function OrdersBoard({
           );
         })}
       </div>
-    </div>
+    </PageShell>
   );
 }
