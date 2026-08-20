@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { createClient, getRole } from "@/lib/supabase/server";
 import { getTimeGreeting } from "@/lib/greeting";
 import { redirect } from "next/navigation";
@@ -78,25 +79,25 @@ export default async function HomePage() {
   if (!day) {
     return (
       <div className="flex min-h-[calc(100dvh-4.5rem)] flex-col">
-        <section className="relative shrink-0 overflow-hidden rounded-[1.75rem] px-6 pt-6 pb-20">
-          <div
-            className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-400"
-            aria-hidden
+        <section className="relative min-h-[14rem] shrink-0 overflow-hidden rounded-[1.75rem] px-6 pt-6 pb-20 lg:min-h-[18rem]">
+          <Image
+            src="/home-hero.png"
+            alt="Pratos servidos no restaurante"
+            fill
+            priority
+            className="object-cover object-center"
+            sizes="(max-width: 1024px) 100vw, 56rem"
           />
           <div
-            className="pointer-events-none absolute -top-10 -right-8 h-44 w-44 rounded-full bg-white/10 blur-2xl"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute top-16 -left-6 h-32 w-32 rounded-full bg-primary-300/20 blur-2xl"
+            className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/20"
             aria-hidden
           />
 
           <div className="relative">
-            <h1 className="max-w-xs text-[2rem] leading-tight font-bold tracking-tight text-white">
+            <h1 className="max-w-xs text-[2rem] leading-tight font-bold tracking-tight text-white drop-shadow-sm lg:max-w-md lg:text-[2.25rem]">
               {greeting}!
             </h1>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/80">
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/90 drop-shadow-sm lg:max-w-md">
               Nenhum dia aberto. Para registrar pedidos, vendas e caixa, inicie
               o dia de operação.
             </p>
