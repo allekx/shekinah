@@ -28,24 +28,17 @@ export default async function RelatorioDiaPage({
     notFound();
   }
 
-  // Nome do responsável
-  const { data: opener } = await supabase
-    .from("profiles")
-    .select("email")
-    .eq("id", day.opened_by ?? "")
-    .maybeSingle();
-
-  // Resumo via get_closeout
-  const { data: closeout, error } = await supabase.rpc("get_closeout", {
-    p_day_id: day.id,
-  });
+  const [openerRes, closeoutRes] = await Promise.all([
+    supabase.from("profiles").select("email").eq("id", day.opened_by ?? "").maybeSingle(),
+    supabase.rpc("get_closeout", { p_day_id: day.id }),
+  ]);
 
   return (
     <ReportView
       day={day}
-      openerEmail={opener?.email ?? null}
-      closeout={closeout}
-      closeoutError={error?.message}
+      openerEmail={openerRes.data?.email ?? null}
+      closeout={closeoutRes.data}
+      closeoutError={closeoutRes.error?.message}
     />
   );
 }

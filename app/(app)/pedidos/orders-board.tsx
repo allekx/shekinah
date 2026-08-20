@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cancelOrderAction } from "@/lib/auth/orders";
 import PageShell from "@/components/page-shell";
@@ -85,7 +85,17 @@ export default function OrdersBoard({
   const [orders, setOrders] = useState<Order[]>(initial);
   const [actionError, setActionError] = useState<string | null>(null);
   const [addFor, setAddFor] = useState<Order | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
+  const ordersByStatus = useMemo(() => {
+    const map: Record<string, Order[]> = {};
+    for (const col of COLUMNS) {
+      map[col.key] = orders
+        .filter((o) => o.status === col.key)
+        .sort((a, b) => a.number - b.number);
+    }
+    return map;
+  }, [orders]);
 
   // Um pedido pode receber itens enquanto não estiver pago/cancelado/entregue
   // (regra da RPC add_items_to_order: novo/em_preparo/pronto com dia aberto).
@@ -127,15 +137,11 @@ export default function OrdersBoard({
             return;
           }
 
-          // Atualização rápida de status (cozinha → em preparo / pronto)
-          if (payload.eventType === "UPDATE" && payload.new && "status" in payload.new) {
-            const updated = payload.new as Partial<Order>;
-            setOrders((prev) => {
-              const exists = prev.some((o) => o.id === orderId);
-              if (!exists && updated.status) {
-                return prev;
-              }
-              return prev
+          const updated = (payload.new as Partial<Order> | null) ?? {};
+
+          if (payload.eventType === "UPDATE") {
+            setOrders((prev) =>
+              prev
                 .map((o) =>
                   o.id === orderId
                     ? {
@@ -147,11 +153,22 @@ export default function OrdersBoard({
                       }
                     : o
                 )
-                .sort((a, b) => a.number - b.number);
-            });
+                .sort((a, b) => a.number - b.number)
+            );
+
+            // Itens só quando o total muda (complemento) ou pedido novo via UPDATE raro
+            if (updated.total != null) {
+              const itemsMap = await fetchItems([orderId]);
+              setOrders((prev) =>
+                prev.map((o) =>
+                  o.id === orderId ? { ...o, items: itemsMap[orderId] ?? o.items } : o
+                )
+              );
+            }
+            return;
           }
 
-          // refresh completo do pedido + itens
+          // INSERT — busca pedido + itens
           const { data: fresh } = await supabase
             .from("orders")
             .select("id, number, customer_name, status, total, paid, created_at, updated_at")
@@ -186,11 +203,7 @@ export default function OrdersBoard({
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayId]);
-
-  const byStatus = (status: string) =>
-    orders.filter((o) => o.status === status).sort((a, b) => a.number - b.number);
+  }, [dayId, supabase]);
 
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -218,7 +231,7 @@ export default function OrdersBoard({
 
       <div className="sk-kanban sk-kanban--4">
         {COLUMNS.map((col) => {
-          const list = byStatus(col.key);
+          const list = ordersByStatus[col.key] ?? [];
           return (
             <div key={col.key} className="sk-card p-3">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-neutral-700">

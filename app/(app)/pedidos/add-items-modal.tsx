@@ -1,19 +1,15 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { addItemsAction } from "@/lib/auth/orders";
 import { getPrinterSettings } from "@/lib/auth/printer-settings";
 import { printComplementReceipt } from "@/lib/printing/print";
 import { toPrintSettings } from "@/lib/printing/settings";
-
-interface Product {
-  id: number;
-  name: string;
-  unit_price: number;
-  category: string | null;
-  tracks_stock: boolean;
-  available: number | null; // null = sem controle de estoque
-}
+import {
+  groupProductsByCategory,
+  parseQtyInput,
+  type CatalogProduct,
+} from "@/lib/catalog";
 
 interface ExistingItem {
   product_name: string;
@@ -47,13 +43,22 @@ export default function AddItemsModal({
     status: string;
     items: ExistingItem[];
   };
-  products: Product[];
+  products: CatalogProduct[];
   onClose: () => void;
   onAdded: (updated: { id: string; total: number }) => void;
 }) {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sortedCategories = useMemo(() => groupProductsByCategory(products), [products]);
+  const [activeCategory, setActiveCategory] = useState(
+    () => sortedCategories[0]?.[0] ?? "Outros"
+  );
+
+  const activeProducts = useMemo(() => {
+    const found = sortedCategories.find(([cat]) => cat === activeCategory);
+    return found?.[1] ?? [];
+  }, [sortedCategories, activeCategory]);
 
   const qty = (id: number) => quantities[id] ?? 0;
   const setQty = (id: number, v: number) =>
@@ -87,31 +92,6 @@ export default function AddItemsModal({
 
   // Bloqueio de produto esgotado
   const canAdd = newItems.length > 0 && !newItems.find((it) => it.available !== null && it.quantity > it.available);
-
-  const byCategory = useMemo(() => {
-    const map: Record<string, Product[]> = {};
-    for (const p of products) {
-      const key = p.category ?? "Outros";
-      (map[key] ??= []).push(p);
-    }
-    return map;
-  }, [products]);
-
-  const sortedCategories = useMemo(() => {
-    const categoryRank = (category: string) => {
-      const name = category.toLowerCase();
-      if (name === "pratos") return 0;
-      if (name === "porções" || name === "porcoes") return 1;
-      if (name === "bebidas") return 2;
-      if (name === "sobremesas") return 3;
-      return 4;
-    };
-    return Object.entries(byCategory).sort(([a], [b]) => {
-      const diff = categoryRank(a) - categoryRank(b);
-      if (diff !== 0) return diff;
-      return a.localeCompare(b, "pt-BR");
-    });
-  }, [byCategory]);
 
   const confirm = async () => {
     if (!canAdd || pending) return;
@@ -194,74 +174,91 @@ export default function AddItemsModal({
 
         {/* Seleção de novos produtos */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {sortedCategories.map(([category, list]) => (
-            <section key={category} className="mb-4">
-              <h3 className="mb-2 sk-section-title">
-                {category}
-              </h3>
-              <ul className="space-y-2">
-                {list.map((p) => {
-                  const n = qty(p.id);
-                  const soldOut = p.available === 0;
-                  return (
-                    <li
-                      key={p.id}
-                      className={`sk-card p-3 ${
-                        soldOut ? "opacity-60" : ""
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-neutral-900">{p.name}</p>
-                          <p className="text-xs sk-text-muted">
-                            {fmtBRL(p.unit_price)}
-                            {p.available !== null && (
-                              <span className="ml-1">
-                                {soldOut ? (
-                                  <span className="sk-badge sk-badge--danger">ESGOTADO</span>
-                                ) : (
-                                  <>· disp. {p.available}</>
-                                )}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        {!soldOut && (
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setQty(p.id, Math.max(0, n - 1))}
-                              className="sk-qty-btn h-8 w-8 text-lg"
-                              aria-label={`Diminuir ${p.name}`}
-                            >
-                              −
-                            </button>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              value={n}
-                              onChange={(e) => setQty(p.id, Number(e.target.value) || 0)}
-                              className="sk-qty-input h-8 w-12 text-base"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setQty(p.id, p.available !== null ? Math.min(p.available, n + 1) : n + 1)
-                              }
-                              className="sk-qty-btn h-8 w-8 text-lg"
-                              aria-label={`Aumentar ${p.name}`}
-                            >
-                              +
-                            </button>
-                          </div>
-                        )}
+          {sortedCategories.length > 1 && (
+            <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
+              {sortedCategories.map(([category]) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setActiveCategory(category)}
+                  className={`sk-category-tab ${
+                    activeCategory === category ? "sk-category-tab--active" : ""
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          )}
+          <section>
+            <h3 className="mb-2 sk-section-title">{activeCategory}</h3>
+            <ul className="space-y-2">
+              {activeProducts.map((p) => {
+                const n = qty(p.id);
+                const soldOut = p.available === 0;
+                return (
+                  <li
+                    key={p.id}
+                    className={`sk-card p-3 ${soldOut ? "opacity-60" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-neutral-900">{p.name}</p>
+                        <p className="text-xs sk-text-muted">
+                          {fmtBRL(p.unit_price)}
+                          {p.available !== null && (
+                            <span className="ml-1">
+                              {soldOut ? (
+                                <span className="sk-badge sk-badge--danger">ESGOTADO</span>
+                              ) : (
+                                <>· disp. {p.available}</>
+                              )}
+                            </span>
+                          )}
+                        </p>
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+                      {!soldOut && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setQty(p.id, Math.max(0, n - 1))}
+                            className="sk-qty-btn h-8 w-8 text-lg"
+                            aria-label={`Diminuir ${p.name}`}
+                          >
+                            −
+                          </button>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={n === 0 ? "" : String(n)}
+                            placeholder="0"
+                            onChange={(e) =>
+                              setQty(p.id, parseQtyInput(e.target.value, p.available))
+                            }
+                            className="sk-qty-input h-8 w-12 text-base"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setQty(
+                                p.id,
+                                p.available !== null ? Math.min(p.available, n + 1) : n + 1
+                              )
+                            }
+                            className="sk-qty-btn h-8 w-8 text-lg"
+                            aria-label={`Aumentar ${p.name}`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         </div>
 
         {/* Rodapé: total adicional + ações */}

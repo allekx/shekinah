@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export interface KitchenActionResult {
@@ -33,9 +32,6 @@ export async function updateStatusAction(formData: FormData): Promise<KitchenAct
     return { error: "Não foi possível atualizar o pedido." };
   }
 
-  // Realtime cobre a atualização nas telas; revalidação p/ segurança nos SSRs.
-  revalidatePath("/", "layout");
-  revalidatePath("/cozinha", "layout");
-  revalidatePath("/pedidos", "layout");
+  // Realtime + atualização otimista na UI — sem revalidar layout inteiro.
   return {};
 }

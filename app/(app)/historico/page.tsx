@@ -10,43 +10,38 @@ export default async function HistoricoPage() {
     redirect("/");
   }
 
-  // Dias encerrados + total vendido por dia
-  const { data: days } = await supabase
-    .from("business_days")
-    .select(
-      "id, day, status, opened_at, closed_at, initial_cash, counted_cash, cash_difference, opened_by"
-    )
-    .order("day", { ascending: false });
+  const [{ data: days }, { data: orderRows }] = await Promise.all([
+    supabase
+      .from("business_days")
+      .select(
+        "id, day, status, opened_at, closed_at, initial_cash, counted_cash, cash_difference, opened_by"
+      )
+      .order("day", { ascending: false }),
+    supabase
+      .from("orders")
+      .select("business_day_id, total")
+      .neq("status", "cancelado"),
+  ]);
 
-  // Para cada dia, conta pedidos e soma total (em paralelo)
-  const enriched = await Promise.all(
-    (days ?? []).map(async (d) => {
-      const [countRes, sumRes] = await Promise.all([
-        supabase
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("business_day_id", d.id)
-          .neq("status", "cancelado"),
-        supabase
-          .from("orders")
-          .select("total")
-          .eq("business_day_id", d.id)
-          .neq("status", "cancelado"),
-      ]);
-      const total = (sumRes.data ?? []).reduce((s, o) => s + Number(o.total), 0);
-      return {
-        id: d.id,
-        day: d.day,
-        status: d.status,
-        opened_at: d.opened_at,
-        closed_at: d.closed_at,
-        initial_cash: Number(d.initial_cash),
-        orders_count: countRes.count ?? 0,
-        total_sales: total,
-        cash_difference: d.cash_difference,
-      };
-    })
-  );
+  const statsByDay: Record<string, { count: number; total: number }> = {};
+  for (const o of orderRows ?? []) {
+    const id = o.business_day_id as string;
+    if (!statsByDay[id]) statsByDay[id] = { count: 0, total: 0 };
+    statsByDay[id].count += 1;
+    statsByDay[id].total += Number(o.total);
+  }
+
+  const enriched = (days ?? []).map((d) => ({
+    id: d.id,
+    day: d.day,
+    status: d.status,
+    opened_at: d.opened_at,
+    closed_at: d.closed_at,
+    initial_cash: Number(d.initial_cash),
+    orders_count: statsByDay[d.id]?.count ?? 0,
+    total_sales: statsByDay[d.id]?.total ?? 0,
+    cash_difference: d.cash_difference,
+  }));
 
   return <HistoryList days={enriched} />;
 }

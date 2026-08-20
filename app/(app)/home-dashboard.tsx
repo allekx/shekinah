@@ -81,19 +81,13 @@ export default function HomeDashboard({
       setLowStock(next);
     };
 
-    const refreshAll = async () => {
-      await Promise.all([refreshMetrics(), refreshLowStock()]);
-    };
-
-    void refreshAll();
-
     const channel = supabase
       .channel(`home-day-${dayId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `business_day_id=eq.${dayId}` },
         () => {
-          void refreshAll();
+          void Promise.all([refreshMetrics(), refreshLowStock()]);
         }
       )
       .subscribe();

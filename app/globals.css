@@ -786,3 +786,51 @@ body {
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* Skeleton loading — pulse suave, cores neutras da marca */
+@keyframes sk-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.sk-skeleton {
+  background: linear-gradient(90deg, var(--n-100) 0%, var(--n-200) 50%, var(--n-100) 100%);
+  background-size: 200% 100%;
+  animation: sk-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Feedback tátil imediato em botões de quantidade */
+.sk-qty-btn:active,
+.sk-btn-primary:active:not(:disabled),
+.sk-btn-success:active:not(:disabled),
+.sk-btn-secondary:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.sk-category-tab {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--n-200);
+  background: #fff;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--n-600);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sk-category-tab:active {
+  transform: scale(0.97);
+}
+
+.sk-category-tab--active {
+  border-color: var(--primary-500);
+  background: var(--primary-50);
+  color: var(--primary-700);
+}

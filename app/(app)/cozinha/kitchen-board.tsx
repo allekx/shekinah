@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { updateStatusAction } from "@/lib/auth/kitchen";
 import BackButton from "@/components/back-button";
@@ -42,13 +42,26 @@ export default function KitchenBoard({
   const [orders, setOrders] = useState<KitchenOrder[]>(initial);
   const [actionError, setActionError] = useState<string | null>(null);
   const [newIds, setNewIds] = useState<string[]>([]);
-  const supabase = createClient();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const supabase = useMemo(() => createClient(), []);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // Feedback sonoro discreto (sem depender dele)
+  const ordersByStatus = useMemo(() => {
+    const map: Record<string, KitchenOrder[]> = {};
+    for (const col of COLUMNS) {
+      map[col.key] = orders
+        .filter((o) => o.status === col.key)
+        .sort((a, b) => a.number - b.number);
+    }
+    return map;
+  }, [orders]);
+
   const playBeep = () => {
     try {
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new Ctx();
+      const Ctx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
+      const ctx = audioCtxRef.current;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -58,7 +71,9 @@ export default function KitchenBoard({
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
       osc.start();
       osc.stop(ctx.currentTime + 0.25);
-    } catch { /* sem áudio, segue normalmente */ }
+    } catch {
+      /* sem áudio */
+    }
   };
 
   // Realtime: ao receber novo pedido (INSERT), destaca e toca beep
@@ -93,12 +108,46 @@ export default function KitchenBoard({
             return;
           }
 
-          // Só mostra colunas da cozinha (novo/em_preparo/pronto)
-          if (["cancelado", "entregue"].includes(String(row.status))) {
+          const updated = row as Partial<KitchenOrder>;
+
+          if (["cancelado", "entregue"].includes(String(updated.status))) {
             setOrders((prev) => prev.filter((o) => o.id !== orderId));
             return;
           }
 
+          if (payload.eventType === "UPDATE") {
+            setOrders((prev) => {
+              const exists = prev.some((o) => o.id === orderId);
+              const patched: KitchenOrder = {
+                id: orderId,
+                number: updated.number ?? prev.find((o) => o.id === orderId)?.number ?? 0,
+                customer_name:
+                  updated.customer_name ??
+                  prev.find((o) => o.id === orderId)?.customer_name ??
+                  null,
+                status: updated.status ?? prev.find((o) => o.id === orderId)?.status ?? "novo",
+                created_at:
+                  updated.created_at ??
+                  prev.find((o) => o.id === orderId)?.created_at ??
+                  new Date().toISOString(),
+                items: prev.find((o) => o.id === orderId)?.items ?? [],
+              };
+              const list = exists
+                ? prev.map((o) => (o.id === orderId ? { ...o, ...patched, items: o.items } : o))
+                : [...prev, patched];
+              return list.sort((a, b) => a.number - b.number);
+            });
+
+            const itemsMap = await fetchItems([orderId]);
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.id === orderId ? { ...o, items: itemsMap[orderId] ?? o.items } : o
+              )
+            );
+            return;
+          }
+
+          // INSERT
           const { data: fresh } = await supabase
             .from("orders")
             .select("id, number, customer_name, status, created_at")
@@ -138,21 +187,22 @@ export default function KitchenBoard({
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayId]);
-
-  const byStatus = (status: string) =>
-    orders.filter((o) => o.status === status).sort((a, b) => a.number - b.number);
+  }, [dayId, supabase]);
 
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
   const onTransition = async (orderId: string, toStatus: string) => {
     setActionError(null);
+    setPendingId(orderId);
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: toStatus } : o))
+    );
     const fd = new FormData();
     fd.set("order_id", orderId);
     fd.set("to_status", toStatus);
     const res = await updateStatusAction(fd);
+    setPendingId(null);
     if (res?.error) setActionError(res.error);
   };
 
@@ -183,7 +233,7 @@ export default function KitchenBoard({
 
       <main className="sk-kanban sk-kanban--3 w-full flex-1 py-4">
         {COLUMNS.map((col) => {
-          const list = byStatus(col.key);
+          const list = ordersByStatus[col.key] ?? [];
           return (
             <section key={col.key} className="sk-card p-3">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-neutral-700">
@@ -240,10 +290,11 @@ export default function KitchenBoard({
                       {col.btn && (
                         <button
                           type="button"
+                          disabled={pendingId === o.id}
                           onClick={() => onTransition(o.id, col.next!)}
-                          className={`mt-4 w-full rounded-xl ${col.btnClass} py-4 text-lg font-black text-white transition active:scale-[.98]`}
+                          className={`mt-4 w-full rounded-xl ${col.btnClass} py-4 text-lg font-black text-white transition active:scale-[.98] disabled:opacity-60`}
                         >
-                          {col.btn}
+                          {pendingId === o.id ? "…" : col.btn}
                         </button>
                       )}
                     </li>

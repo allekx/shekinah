@@ -72,9 +72,8 @@ export async function addItemsAction(
     .in("id", items.map((it) => it.product_id));
   for (const p of catalog ?? []) namesById[p.id] = p.name;
 
-  revalidatePath("/", "layout");
-  revalidatePath("/pedidos", "layout");
-  revalidatePath("/cozinha", "layout");
+  revalidatePath("/caixa");
+  revalidatePath("/estoque");
 
   return {
     orderId: data?.id as string | undefined,
@@ -124,10 +123,9 @@ export async function cancelOrderAction(formData: FormData): Promise<CancelOrder
     return { error: "Não foi possível cancelar o pedido." };
   }
 
-  revalidatePath("/", "layout");
-  revalidatePath("/pedidos", "layout");
-  revalidatePath("/cozinha", "layout");
-  revalidatePath("/caixa", "layout");
+  revalidatePath("/caixa");
+  revalidatePath("/estoque");
+
   return {};
 }
 
@@ -160,6 +158,15 @@ export async function createOrderAction(
   const quantities = formData.getAll("quantity").map((q) => Number(String(q)));
   const prices = formData.getAll("unit_price").map((p) => Number(String(p)));
 
+  // Nomes dos produtos vêm do formulário (evita consulta extra ao catálogo).
+  const productNames = formData.getAll("product_name").map(String);
+  const namesById: Record<number, string> = {};
+  for (let i = 0; i < productIds.length; i++) {
+    if (productIds[i] > 0 && productNames[i]) {
+      namesById[productIds[i]] = productNames[i];
+    }
+  }
+
   const items: OrderItemInput[] = [];
   for (let i = 0; i < productIds.length; i++) {
     const qty = quantities[i] ?? 0;
@@ -172,10 +179,9 @@ export async function createOrderAction(
     }
   }
 
-  // Busca o nome do produto no catálogo (para a comanda de impressão).
+  // Busca nomes faltantes no catálogo (fallback se o form não enviou).
   const idsInItems = items.map((it) => it.product_id);
-  const namesById: Record<number, string> = {};
-  if (idsInItems.length > 0) {
+  if (idsInItems.some((id) => !namesById[id])) {
     const { data: catalog } = await supabase
       .from("products")
       .select("id, name")
@@ -222,8 +228,7 @@ export async function createOrderAction(
     return { error: mapCreateOrderError(error.message) };
   }
 
-  revalidatePath("/", "layout");
-  revalidatePath("/cozinha", "layout");
+  revalidatePath("/caixa");
 
   // Retorna o pedido criado para o frontend redirecionar/confirmar,
   // incluindo os itens (com nome) para montar a comanda de impressão.

@@ -59,8 +59,9 @@ SHEKINAH/
 │  │  ├─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar (input qty: texto, vazio=0)
 │  │  └─ open-day-add-product.tsx  # client: cadastrar produto antes de abrir o dia
 │  ├─ (app)/cozinha/           # Interface exclusiva da cozinha
-│  │  ├─ page.tsx              #   server: pedidos do dia (sem preços)
-│  │  └─ kitchen-board.tsx     #   client: 3 colunas + Realtime + botões
+│  │  ├─ page.tsx              #   server: pedidos + itens do dia (join aninhado)
+│  │  ├─ loading.tsx           #   skeleton kanban
+│  │  └─ kitchen-board.tsx     #   client: 3 colunas + Realtime + update otimista
 │  ├─ (app)/produtos/          # Gerenciamento de produtos (CRUD, john)
 │  │  ├─ page.tsx              #   server: lista produtos + formulário
 │  │  ├─ product-form.tsx      #   client: criar produto
@@ -69,7 +70,8 @@ SHEKINAH/
 │  │  ├─ page.tsx              #   server: saldo + movimentações
 │  │  └─ stock-panel.tsx       #   client: ajuste +/- e histórico
 │  ├─ (app)/caixa/             # Módulo de caixa (john)
-│  │  ├─ page.tsx              #   server: resumo via get_closeout + a receber
+│  │  ├─ page.tsx              #   server: get_closeout + pendentes (paralelo)
+│  │  ├─ loading.tsx           #   skeleton
 │  │  └─ cashier-panel.tsx     #   client: resumo, receber pagamento, conferência
 │  ├─ (app)/fechamento/        # Fechamento do dia (john)
 │  │  ├─ page.tsx              #   server: detalhes via get_closeout + estado encerrado
@@ -83,14 +85,18 @@ SHEKINAH/
 │  │     ├─ page.tsx           #   server: get_closeout + responsável
 │  │     └─ report-view.tsx    #   client: detalhes + imprimir relatório (preview)
 │  ├─ (app)/pedidos/novo/      # Novo pedido (atendimento, john)
-│  │  ├─ page.tsx              #   server: produtos + disponibilidade do dia
-│  │  └─ new-order-form.tsx    #   client: cliente, itens, total, pagamento, finalizar
+│  │  ├─ page.tsx              #   server: catálogo + impressora (paralelo)
+│  │  ├─ loading.tsx           #   skeleton produtos/categorias
+│  │  └─ new-order-form.tsx    #   client: abas de categoria, qty, finalizar, comanda
 │  ├─ (app)/pedidos/           # Acompanhamento de pedidos (john, Realtime)
-│  │  ├─ page.tsx              #   server: pedidos + itens do dia
-│  │  └─ orders-board.tsx      #   client: grid status + Realtime
+│  │  ├─ page.tsx              #   server: pedidos + itens do dia (join aninhado)
+│  │  ├─ loading.tsx           #   skeleton kanban
+│  │  └─ orders-board.tsx      #   client: grid status + Realtime otimizado
+│  ├─ (app)/loading.tsx        # Skeleton padrão da área autenticada
 │  ├─ layout.tsx               # Layout raiz (metadata, ícones favicon/PWA, pt-BR)
+│  ├─ manifest.ts              # Manifest PWA (standalone, Next.js)
 │  ├─ icon.svg                 # Favicon Next.js (mesmo símbolo da marca)
-│  └─ globals.css
+│  └─ globals.css              # Design system sk-* + skeleton + feedback tátil
 ├─ lib/
 │  ├─ auth/actions.ts          # Server actions: login, logout
 │  ├─ auth/open-day.ts         # Server action: openDay (abertura do dia)
@@ -102,7 +108,9 @@ SHEKINAH/
 │  ├─ auth/close-day.ts        # Server action: closeDay (fechamento)
 │  ├─ auth/users.ts            # Server actions: gestão de usuários (Admin API server-side)
 │  ├─ supabase/admin.ts        # Cliente service_role — SOMENTE servidor (criar/redefinir senha/e-mail)
-│  ├─ greeting.ts                # Saudação dinâmica (Bom dia/tarde/noite, fuso America/Sao_Paulo)
+│  ├─ supabase/queries.ts      # Helpers memoizados: getOpenBusinessDay, getCatalogWithStock
+│  ├─ catalog.ts               # groupProductsByCategory, parseQtyInput, tipos de catálogo
+│  ├─ greeting.ts              # Saudação dinâmica (Bom dia/tarde/noite, fuso America/Sao_Paulo)
 │  └─ printing/                # Camada modular de impressão
 │     ├─ types.ts              #   interfaces ReceiptBuilder/PrinterTransport
 │     ├─ text-builder.ts       #   formatador de texto (largura em colunas)
@@ -111,6 +119,7 @@ SHEKINAH/
 │     └─ transports.ts         #   transportes plugáveis (preview default + stubs)
 ├─ components/
 │  ├─ page-shell.tsx              # Cabeçalho padrão das páginas internas (BackButton + título)
+│  ├─ skeletons/page-skeletons.tsx # Skeletons (produtos, kanban, caixa, home)
 │  ├─ brand-mark-icon.tsx         # Ícone da marca (sítio + cozinha + pedido)
 │  ├─ brand-wordmark.tsx          # Marca Shekinah (ícone + logotipo tipográfico)
 │  ├─ print/
@@ -118,8 +127,7 @@ SHEKINAH/
 │  ├─ sw-register.tsx             # Registro do service worker (PWA)
 │  └─ connection-banner.tsx       # Banner de sem-conexão (aviso online/offline)
 ├─ public/                        # Assets PWA
-│  ├─ manifest.webmanifest        #   manifest (standalone, icons, theme)
-│  ├─ sw.js                       #   service worker (network-first, app-shell)
+│  ├─ sw.js                       #   service worker (network-first, standalone)
 │  ├─ home-hero.png               #   foto hero da home sem dia aberto
 │  ├─ brand-mark.svg              #   símbolo da marca (transparente, para maskable)
 │  ├─ icon.svg                    #   ícone principal (gradiente primary + BrandMarkIcon)
@@ -251,7 +259,8 @@ Criação de usuários:
 - [x] Dashboard principal do John (home /) — sem dia → INICIAR DIA; com dia → métricas ao vivo (Realtime) + saudação dinâmica + grid Ações (Pedidos, Caixa, Estoque, **Usuários**)
 - [x] Gestão de usuários (/usuarios) — criar cozinha/atendimento, alterar e-mail, trocar papel, redefinir senha (john + Admin API server-side)
 - [x] Identidade visual unificada (design system `sk-*` em globals.css) — mobile-first, padding lateral consistente, PageShell nas telas internas
-- [x] PWA (Android) — manifest, ícones (192/512/maskable/apple/favicon 16+32), service worker manual, viewport, banner de conexão, anti-duplicação verificada; **favicon = BrandMarkIcon** (gradiente laranja da marca, igual ao header/login)
+- [x] PWA (Android) — manifest (`app/manifest.ts`), ícones, service worker, modo standalone; favicon = BrandMarkIcon
+- [x] Performance e UX de carregamento — queries otimizadas, skeleton loading, abas de categoria, Realtime/refetch reduzidos, cache por request (sem alterar fluxo de pedidos)
 
 Legenda: `[x]` concluído · `[~]` parcialmente implementado · `[ ]` ainda não implementado
 
@@ -312,6 +321,9 @@ DIA ENCERRADO
 - Foi decidida a **identidade visual da marca**: ícone customizado (casa rústica + fumaça de cozinha + prato) substituindo a letra "S"; logotipo **SHEKINAH** em uppercase com `tracking-[0.18em]` (componentes `brand-mark-icon` + `brand-wordmark`).
 - Foi decidida a **paleta laranja da identidade visual** (restaurante no sítio): laranja forte `#FF8A4F` (`primary-500`) e pêssego `#FFC176` (`primary-300`). Escala completa em `app/globals.css` (`primary-50`…`primary-900`); substitui o azul anterior em todo o app (botões, gradientes, focus, PWA `theme_color`).
 - Foi decidido que **favicon e ícones PWA** usam o **mesmo símbolo da marca** (`BrandMarkIcon` — sítio + cozinha + pedido) sobre gradiente `primary-600` → `primary-700`, alinhado ao header/login (`public/icon.svg`, `app/icon.svg`, PNGs via `npm run icons`). Substitui o ícone antigo com letra "S".
+- Foi decidido que **cache de dados no frontend** usa `React.cache()` no servidor (por request) para dia aberto e catálogo — **sem** cache client de estoque/preço (evita pedidos com disponibilidade incorreta).
+- Foi decidido que **novo pedido e complementos** usam **abas de categoria** (troca instantânea no client; dados vêm do SSR) em vez de renderizar todas as categorias de uma vez.
+- Foi decidido que telas com Realtime **não** disparam `revalidatePath(..., "layout")` a cada ação — Realtime + update otimista cobrem pedidos/cozinha/home; revalidação limitada a `/caixa` e `/estoque` (sem Realtime).
 
 ## 11. Impressão
 
@@ -621,6 +633,43 @@ Build OK local. **NÃO commitado/deployado ainda.**
 - Login `lg+`: layout duas colunas (notebook) — hero à esquerda, formulário à direita.
 - Home sem dia aberto: hero com foto `public/home-hero.png` + gradiente escuro (substitui bloco laranja sólido).
 
+### 20/08/2026 (manhã) — PWA STANDALONE + OTIMIZAÇÃO DE PERFORMANCE
+
+**PWA modo app (correção):**
+- Service worker: instalação resiliente (não quebra em redirect de `/`); cache de `/login` em vez de `/`.
+- `app/manifest.ts` (substitui `public/manifest.webmanifest`): `display: standalone`, `id`, `display_override`.
+- iOS: `appleWebApp.statusBarStyle: black-translucent`; CSS `display-mode: standalone` com safe-area.
+- **Reinstalar** o app no celular após deploy para atalho antigo não abrir como navegador.
+
+**Otimização de performance e carregamento (sem mudar fluxo/RPCs):**
+
+*Consultas Supabase:*
+- `/pedidos` e `/cozinha`: join aninhado `orders + order_items` (só do dia) — antes carregava **todos** os itens históricos.
+- `/historico`: 2 queries totais (dias + pedidos agregados) — antes N+1 (2× por dia).
+- `/caixa`, `/relatorio/[dayId]`: `Promise.all` para paralelizar.
+- `lib/supabase/queries.ts`: `getOpenBusinessDay()`, `getCatalogWithStock()` memoizados com `React.cache()`.
+- `createOrderAction`: nomes de produto vêm do form (`product_name` hidden) — evita SELECT extra ao catálogo.
+
+*UX / carregamento:*
+- `loading.tsx` + `components/skeletons/page-skeletons.tsx` (app, pedidos, novo pedido, cozinha, caixa).
+- `.sk-skeleton`, `.sk-category-tab`, feedback tátil `active:scale` em botões.
+- **Novo pedido** e **modal complemento**: abas de categoria (1 categoria visível; troca instantânea).
+- Config impressora via SSR em `/pedidos/novo` (sem `getPrinterSettings()` no submit).
+
+*Client / Realtime:*
+- `orders-board` / `kitchen-board`: `useMemo(createClient)`; listas por status memoizadas.
+- Realtime: UPDATE de status sem refetch completo; itens só quando total muda (complemento).
+- Cozinha: update otimista ao mudar status; botão com estado pending.
+- Home: remove refetch duplicado no mount (SSR + Realtime bastam).
+
+*revalidatePath:*
+- Cozinha (`updateStatusAction`): removido — Realtime cobre.
+- Pedidos/complemento/cancelamento: só `/caixa` e `/estoque` (telas sem Realtime).
+
+Build OK local. **NÃO commitado/deployado ainda.** Nenhuma dependência nova. Nenhuma migration Supabase.
+
+**Testar:** pedido com itens em várias categorias; complemento; cozinha (botões rápidos); navegação com skeleton; histórico com muitos dias.
+
 ## 15. Estado atual
 
 ```
@@ -630,35 +679,36 @@ Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): mig
 Funcionalidades operacionais completas (abertura → fechamento). Impressão web (preview + comanda/complemento) OK;
 transporte físico da impressora ainda por definir.
 
-ALTERAÇÕES LOCAIS RECENTES (20/08/2026 — NÃO commitadas/deployadas):
-- Correção input de quantidade em /abrir-dia (estoque inicial): apagar/digitar normalmente.
-- Favicon + ícones PWA alinhados à marca (BrandMarkIcon, gradiente laranja, favicon-16/32, maskable laranja).
-- Script `npm run icons` para regerar PNGs a partir de `public/icon.svg`.
+ALTERAÇÕES LOCAIS RECENTES (20/08/2026 manhã — NÃO commitadas/deployadas):
+- Otimização de performance: queries (order_items filtrado, histórico agregado), helpers cacheados, skeleton loading.
+- Novo pedido/complemento: abas de categoria, impressora SSR, menos revalidatePath.
+- Realtime otimizado (boards + home); cozinha com update otimista.
+- PWA standalone (manifest.ts, SW v2) — ver sessão 20/08 manhã.
 
-ALTERAÇÕES LOCAIS ANTERIORES (19/08/2026 sessão 2 — podem estar parcialmente commitadas):
-- Design system `sk-*` + padding lateral + PageShell em todas as telas internas.
-- Home com Realtime (`home-dashboard.tsx`), saudação dinâmica, grid Ações inclui Usuários.
-- Gestão de usuários `/usuarios` (criar, e-mail, papel, senha) via Admin API server-side.
-- `.env.example` atualizado com `SUPABASE_SERVICE_ROLE_KEY`.
-- Correções UX: login (layout notebook lg+), home hero com foto, rodapé novo pedido, caixa (Pix-only), Realtime home/pedidos.
+ALTERAÇÕES LOCAIS ANTERIORES (20/08/2026 — commitadas: favicon, qty abrir-dia, PWA parcial):
+- Correção input de quantidade em /abrir-dia.
+- Favicon + ícones PWA alinhados à marca (`npm run icons`).
+
+ALTERAÇÕES ANTERIORES (19/08/2026 sessão 2):
+- Design system `sk-*`, usuários, Realtime home, login notebook, hero home.
 
 ÚLTIMA ETAPA CONCLUÍDA:
-Correção UX abertura do dia (qty) + favicon/PWA com identidade visual da marca — build OK local.
+Otimização completa de desempenho e UX de carregamento (queries, skeleton, categorias, Realtime) + PWA standalone — build OK local.
 
 PRÓXIMA ETAPA:
-1) Configurar `SUPABASE_SERVICE_ROLE_KEY` no Vercel (Production) para gestão de usuários em produção.
-2) Commit + deploy manual das alterações locais (usuário fará pelo terminal).
-3) Transporte físico REAL da impressora (rede/web-bluetooth/usb) — depende do modelo escolhido.
-4) Operação real com múltiplos atendentes (validar fluxo completo).
+1) Commit + deploy das alterações locais (performance + PWA).
+2) Reinstalar PWA no celular após deploy.
+3) Configurar `SUPABASE_SERVICE_ROLE_KEY` no Vercel (se ainda não feito).
+4) Transporte físico REAL da impressora — depende do modelo escolhido.
+5) Validar fluxo completo com múltiplos atendentes.
 
 PROBLEMAS PENDENTES:
-- Alterações locais **NÃO commitadas/deployadas** (inclui qty abrir-dia + favicon/PWA).
-- `SUPABASE_SERVICE_ROLE_KEY` obrigatória localmente e no Vercel para criar/redefinir usuários pelo app.
-- Tela `/estoque` sem Realtime (recarregar para ver ajuste de outro atendente).
-- Relatório não detalha vendas por atendente (dado `payments.created_by` existe no banco).
-- Modelo/método da impressora INDEFINIDO (fluxo web OK; transporte real por definir — seção 11).
-- PERFORMANCE: bundle client, loading/skeleton e índices pendentes.
-- Erros TypeScript pré-existentes em alguns arquivos (`printer-config-form`, `transports.ts`) — não bloqueiam dev.
+- Alterações de **performance/PWA** locais **NÃO commitadas/deployadas**.
+- `/estoque` sem Realtime entre atendentes.
+- Relatório sem breakdown por atendente.
+- Bundle client `@supabase/supabase-js` ainda grande (otimização futura).
+- Índices SQL recomendados (`stock_movements.business_day_id`) não aplicados.
+- Modelo/método da impressora INDEFINIDO.
 ```
 
 ---
@@ -690,9 +740,9 @@ Auditoria completa realizada (revisão de código + banco + testes de intrusão 
 6. **Troco aceito em Pix/cartão** → bloqueado (`TROCO_SOMENTE_DINHEIRO`) (0014). ✅
 7. **`apply_payment_internal` exigia john** (já corrigido na 0013). ✅
 
-## 17. Auditoria de Performance (12/08/2026)
+## 17. Auditoria de Performance (12/08/2026) — atualizado 20/08/2026
 
-**Auditoria realizada (somente leitura de código/banco + medições reais de produção). NENHUMA alteração feita. Nada implementado ainda — aguardando autorização.**
+**Auditoria inicial (12/08/2026):** somente leitura + medições em produção. **Implementação (20/08/2026):** otimizações de código abaixo — sem custo, sem migration, sem novas dependências.
 
 ### Contexto
 
@@ -745,38 +795,34 @@ Auditoria completa realizada (revisão de código + banco + testes de intrusão 
 #### 🟢 BAIXO — Sem `loading.tsx`/Suspense nas rotas dinâmicas
 - As páginas server renderizam só após TODAS as consultas resolverem (padrão "espera tudo carregar"). Não há skeleton/loading → a interface "aparece de uma vez" após o fetch, ampliando a sensação de lentidão.
 
+#### 🟢 BAIXO — Sem `loading.tsx`/Suspense nas rotas dinâmicas
+- ~~As páginas server renderizam só após TODAS as consultas resolverem~~ → **IMPLEMENTADO 20/08/2026**: `loading.tsx` + skeletons em app, pedidos, novo pedido, cozinha, caixa.
+
 ### O que está OK (não alterar)
 
 - Índices de `orders` (business_day_id, status, number) e `daily_stock` (business_day_id, product_id) são adequados.
-- Realtime só em `orders` (necessário para cozinha/pedidos); sem abusos.
-- Server actions com RPC atômica (sem chamadas duplicadas na criação de pedido — o `createOrderAction` faz 1 RPC + 1 SELECT products para nomes).
+- Realtime só em `orders` (necessário para cozinha/pedidos); handlers otimizados em 20/08/2026.
+- Server actions com RPC atômica; `createOrderAction` faz 1 RPC (nomes do form quando possível).
 - Sem API routes, sem `dangerouslySetInnerHTML`, RLS em todas as tabelas.
 
-### Otimizações recomendadas (por impacto/risco — NÃO implementadas)
+### Otimizações — status
 
-1. **✅ CRÍTICO — Eliminar chamadas redundantes de auth/perfil (IMPLEMENTADO em 12/08/2026)**:
-   - **Solução aplicada**: `lib/supabase/server.ts` agora exporta `getUser` e `getRole` **memoizados via React `cache()`** (uma única chamada ao Supabase por request). O `(app)/layout.tsx` e todas as páginas usam `getRole()`/`getUser()` — eliminando o `getUser()` + `SELECT profiles` duplicado (antes: middleware + layout + cada página = ~6 chamadas; agora: 1 de cada, compartilhadas por request).
-   - Login: `signInWithPassword` não é seguido de `getUser()` redundante; usa `getRole()` para o redirect por perfil.
-   - O middleware permanece com sua guarda por perfil em borda (necessária e executada uma vez por request).
-   - Build OK. **Segurança preservada** (RLS + RPCs continuam validando papel; o `getRole()` é a fonte única por request).
-2. **ALTO — Reduzir o bundle client** (NÃO implementado):
-   - Usar `createClient()` client-side **somente** nos componentes que precisam de Realtime (kitchen/orders boards). Os demais client components não precisam do supabase-js.
-   - `dynamic import`/lazy dos boards (que são pesados) e/ou manter o supabase-js só onde necessário.
-   - Impacto: JS inicial menor → interface interativa mais cedo.
-3. **✅ MÉDIO — Login mais rápido (IMPLEMENTADO em 12/08/2026)**: `signInWithPassword` não é seguido de `getUser()` redundante (a resposta já traz o usuário); redirect por perfil via `getRole()`. −1 RTT no login.
-4. **MÉDIO — Paralelizar consultas server** (NÃO implementado):
-   - Agrupar `getUser` + `profiles` + `day` + dados em `Promise.all` onde hoje é sequencial (ex.: home).
-   - Impacto: reduz tempo até a renderização.
-5. **MÉDIO — Adicionar `loading.tsx`/Suspense** nas rotas que fazem múltiplas consultas (dashboard, pedidos, caixa) com skeleton leve → interface aparece antes. (NÃO implementado)
-6. **BAIXO — Índices recomendados** (documentar apenas; aplicar com autorização):
-   - `CREATE INDEX idx_stock_movements_day ON stock_movements(business_day_id);`
-   - `CREATE INDEX idx_profiles_email ON profiles(email);` (se usado por auth/gestão)
+1. **✅ CRÍTICO — Auth/perfil memoizado (12/08/2026)**: `getUser`/`getRole` via `React.cache()` em `lib/supabase/server.ts`.
+2. **⏳ ALTO — Reduzir bundle client** (pendente): lazy/dynamic import dos boards; supabase-js só onde Realtime exige.
+3. **✅ MÉDIO — Login mais rápido (12/08/2026)**: sem `getUser()` redundante após sign-in.
+4. **✅ PARCIAL — Paralelizar consultas (20/08/2026)**: caixa, relatório, histórico; helpers `getOpenBusinessDay`/`getCatalogWithStock`.
+5. **✅ MÉDIO — loading.tsx + skeleton (20/08/2026)**: `components/skeletons/page-skeletons.tsx`.
+6. **✅ CRÍTICO — order_items sem filtro (20/08/2026)**: join aninhado em pedidos/cozinha.
+7. **✅ ALTO — Histórico N+1 (20/08/2026)**: agregação em 2 queries.
+8. **✅ MÉDIO — revalidatePath layout (20/08/2026)**: removido onde Realtime cobre; mantido caixa/estoque.
+9. **✅ MÉDIO — Realtime refetch duplo (20/08/2026)**: boards patch local + fetch seletivo.
+10. **✅ UX — Abas de categoria (20/08/2026)**: novo pedido + modal complemento.
+11. **⏳ BAIXO — Índices SQL** (pendente, requer migration): `stock_movements(business_day_id)`.
 
-### Próxima etapa
+### Próxima etapa (performance)
 
-- **Otimizações 1 (CRÍTICO) e 3 (login) IMPLEMENTADAS em 12/08/2026** (build OK, NÃO commitado ainda).
-- **Aguardando autorização para**: (2) reduzir bundle client → (4) paralelizar consultas → (5) loading/skeleton → (6) índices (com revisão).
-- Alterações atuais não commitadas (aguardando revisão).
+- **Implementado em 20/08/2026** (build OK, aguardando commit/deploy).
+- **Pendente**: reduzir bundle client; índice em `stock_movements`; cache de role no middleware (opcional).
 
 ### Recomendações documentadas (NÃO implementadas — não geram custo, mas são boas práticas)
 
