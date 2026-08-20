@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   description:
     "Sistema de gestão do restaurante Shekinah — pedidos, cozinha, estoque e caixa.",
   applicationName: "Shekinah",
-  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
@@ -31,7 +30,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Shekinah",
   },
   formatDetection: { telephone: false },

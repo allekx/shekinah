@@ -772,3 +772,17 @@ body {
   background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
   padding: 0.875rem 1rem;
 }
+
+/* PWA instalado — aparência de app (sem barra do navegador) */
+@media (display-mode: standalone) {
+  html {
+    overscroll-behavior: none;
+  }
+
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    -webkit-tap-highlight-color: transparent;
+  }
+}

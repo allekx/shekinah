@@ -1,0 +1,41 @@
+import type { MetadataRoute } from "next";
+
+/** Manifest PWA — modo standalone (sem barra de endereço do navegador). */
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    id: "/",
+    name: "Sistema Shekinah",
+    short_name: "Shekinah",
+    description:
+      "Sistema de gestão do restaurante Shekinah — pedidos, cozinha, estoque e caixa.",
+    start_url: "/",
+    scope: "/",
+    display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
+    orientation: "portrait",
+    background_color: "#f5f5f5",
+    theme_color: "#FF8A4F",
+    lang: "pt-BR",
+    categories: ["food", "business"],
+    icons: [
+      {
+        src: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512-maskable.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
+    ],
+  };
+}
