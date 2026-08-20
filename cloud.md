@@ -45,10 +45,10 @@ O objetivo principal do sistema é permitir que o estabelecimento controle todo 
 SHEKINAH/
 ├─ cloud.md                    # Documento Central de Memória e Continuidade
 ├─ app/                        # Frontend Next.js (App Router)
-│  ├─ (auth)/login/page.tsx    # Login mobile-first — hero laranja + card flutuante (sem cadastro público)
+│  ├─ (auth)/login/page.tsx    # Login mobile-first — hero laranja + card; lg+ layout duas colunas (notebook)
 │  ├─ (app)/layout.tsx         # Shell autenticado (header + sessão + logout)
 │  ├─ (app)/session-header.tsx # Cabeçalho de sessão (marca + perfil + botão sair)
-│  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA
+│  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA (sem dia: hero com foto home-hero.png)
 │  ├─ (app)/home-dashboard.tsx # Client: métricas ao vivo (Realtime orders) + grid Ações
 │  ├─ (app)/usuarios/          # Gestão de usuários (john) — criar, e-mail, papel, senha
 │  │  ├─ page.tsx              #   server: lista profiles
@@ -56,7 +56,7 @@ SHEKINAH/
 │  │  └─ user-list.tsx         #   client: editar e-mail, papel, redefinir senha
 │  ├─ (app)/abrir-dia/         # Abertura do dia
 │  │  ├─ page.tsx              #   server: carrega produtos, redireciona se dia aberto
-│  │  ├─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar
+│  │  ├─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar (input qty: texto, vazio=0)
 │  │  └─ open-day-add-product.tsx  # client: cadastrar produto antes de abrir o dia
 │  ├─ (app)/cozinha/           # Interface exclusiva da cozinha
 │  │  ├─ page.tsx              #   server: pedidos do dia (sem preços)
@@ -88,7 +88,8 @@ SHEKINAH/
 │  ├─ (app)/pedidos/           # Acompanhamento de pedidos (john, Realtime)
 │  │  ├─ page.tsx              #   server: pedidos + itens do dia
 │  │  └─ orders-board.tsx      #   client: grid status + Realtime
-│  ├─ layout.tsx               # Layout raiz (metadata, pt-BR)
+│  ├─ layout.tsx               # Layout raiz (metadata, ícones favicon/PWA, pt-BR)
+│  ├─ icon.svg                 # Favicon Next.js (mesmo símbolo da marca)
 │  └─ globals.css
 ├─ lib/
 │  ├─ auth/actions.ts          # Server actions: login, logout
@@ -119,8 +120,11 @@ SHEKINAH/
 ├─ public/                        # Assets PWA
 │  ├─ manifest.webmanifest        #   manifest (standalone, icons, theme)
 │  ├─ sw.js                       #   service worker (network-first, app-shell)
-│  ├─ icon.svg + icon-192/512/maskable.png + apple-touch-icon.png
-├─ scripts/generate-icons.mjs     # Gera os ícones PNG via sharp (node scripts/generate-icons.mjs)
+│  ├─ home-hero.png               #   foto hero da home sem dia aberto
+│  ├─ brand-mark.svg              #   símbolo da marca (transparente, para maskable)
+│  ├─ icon.svg                    #   ícone principal (gradiente primary + BrandMarkIcon)
+│  ├─ icon-192/512/maskable.png + apple-touch-icon.png + favicon-16/32.png
+├─ scripts/generate-icons.mjs     # Gera PNGs do PWA via sharp (`npm run icons`)
 ├─ middleware.ts               # Sessão + proteção de rotas + guarda por perfil + assets públicos PWA
 ├─ .env.local                  # URL + anon key + SUPABASE_SERVICE_ROLE_KEY (secret, só servidor)
 ├─ .env.example                # Template (inclui placeholder da service_role / Secret key)
@@ -233,7 +237,7 @@ Criação de usuários:
 - [x] Autenticação (login/logout/sessão/proteção de rotas/perfil) — testada com usuários reais do painel
 - [x] Abertura do dia (tela /abrir-dia + dashboard + RPC) — testada
 - [x] Cadastro de produto na abertura do dia (/abrir-dia — antes de confirmar abertura; reutiliza `createProduct`)
-- [x] Estoque inicial (grade com [-] qty [+], validação, persistência) — testada
+- [x] Estoque inicial (grade com [-] qty [+], validação, persistência) — testada; input de quantidade corrigido (campo vazio ao digitar, mesmo padrão de `/pedidos/novo`)
 - [x] Caixa inicial (informado na abertura, registrado) — testado
 - [x] Produtos (CRUD: nome, categoria, preço, ativo/inativo; somente john) — testado
 - [x] Estoque operacional (saldo do dia, ajuste +/-, ESGOTADO, histórico de movimentações) — testado
@@ -247,7 +251,7 @@ Criação de usuários:
 - [x] Dashboard principal do John (home /) — sem dia → INICIAR DIA; com dia → métricas ao vivo (Realtime) + saudação dinâmica + grid Ações (Pedidos, Caixa, Estoque, **Usuários**)
 - [x] Gestão de usuários (/usuarios) — criar cozinha/atendimento, alterar e-mail, trocar papel, redefinir senha (john + Admin API server-side)
 - [x] Identidade visual unificada (design system `sk-*` em globals.css) — mobile-first, padding lateral consistente, PageShell nas telas internas
-- [x] PWA (Android) — manifest, ícones (192/512/maskable/apple), service worker manual, viewport, banner de conexão, anti-duplicação verificada
+- [x] PWA (Android) — manifest, ícones (192/512/maskable/apple/favicon 16+32), service worker manual, viewport, banner de conexão, anti-duplicação verificada; **favicon = BrandMarkIcon** (gradiente laranja da marca, igual ao header/login)
 
 Legenda: `[x]` concluído · `[~]` parcialmente implementado · `[ ]` ainda não implementado
 
@@ -307,6 +311,7 @@ DIA ENCERRADO
 - Foi decidido que **novos produtos podem ser cadastrados na tela /abrir-dia** antes de iniciar o dia (reutiliza `createProduct`; ordem da grade: Pratos → Bebidas → cadastrar produto → caixa).
 - Foi decidida a **identidade visual da marca**: ícone customizado (casa rústica + fumaça de cozinha + prato) substituindo a letra "S"; logotipo **SHEKINAH** em uppercase com `tracking-[0.18em]` (componentes `brand-mark-icon` + `brand-wordmark`).
 - Foi decidida a **paleta laranja da identidade visual** (restaurante no sítio): laranja forte `#FF8A4F` (`primary-500`) e pêssego `#FFC176` (`primary-300`). Escala completa em `app/globals.css` (`primary-50`…`primary-900`); substitui o azul anterior em todo o app (botões, gradientes, focus, PWA `theme_color`).
+- Foi decidido que **favicon e ícones PWA** usam o **mesmo símbolo da marca** (`BrandMarkIcon` — sítio + cozinha + pedido) sobre gradiente `primary-600` → `primary-700`, alinhado ao header/login (`public/icon.svg`, `app/icon.svg`, PNGs via `npm run icons`). Substitui o ícone antigo com letra "S".
 
 ## 11. Impressão
 
@@ -571,7 +576,7 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 - **`app/globals.css`**: tokens `primary-*` redefinidos — base `#FF8A4F` (500) e `#FFC176` (300); sombras/focus dos componentes `sk-*` atualizadas.
 - **Login** passa a usar `primary-*` (sem hex hardcoded).
 - **Telas com `blue-*` ou hex azul** migradas para `primary-*` (abrir-dia, caixa, estoque, fechamento, novo pedido, header, cozinha).
-- **PWA**: `theme_color` / `themeColor` → `#FF8A4F`; `public/icon.svg` atualizado (PNG precisa regerar com `node scripts/generate-icons.mjs` se desejado).
+- **PWA**: `theme_color` / `themeColor` → `#FF8A4F`; ícones PNG regerados com BrandMarkIcon (`npm run icons`) — ver 20/08/2026.
 - Build OK. **NÃO commitado/deployado ainda.**
 
 ### 19/08/2026 (noite, sessão 2) — DESIGN SYSTEM, USUÁRIOS, CORREÇÕES UX + REALTIME
@@ -596,6 +601,26 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
 
 Build OK local. **NÃO commitado/deployado ainda.**
 
+### 20/08/2026 — CORREÇÃO UX ABERTURA DO DIA + FAVICON/PWA ALINHADO À MARCA
+
+**Bug: input de quantidade em /abrir-dia (estoque inicial):**
+- Sintoma: campo vinha com `0` fixo; não apagava; digitar `10` virava `010`.
+- Causa: input controlado `type="number"` com `value={qty}` e `Number(e.target.value) || 0` (string vazia voltava a 0).
+- Correção em `open-day-form.tsx`: mesmo padrão de `new-order-form.tsx` — `type="text"` + `inputMode="numeric"`, `value={n === 0 ? "" : String(n)}`, `placeholder="0"`, `parseQtyInput()`. Botões +/- inalterados. Submit: campo vazio → `0` no servidor.
+
+**Favicon e ícones PWA (identidade visual):**
+- Substituído ícone antigo (letra "S" em fundo laranja) pelo **BrandMarkIcon** (sítio + cozinha + pedido), igual ao header/login.
+- `public/icon.svg` + `app/icon.svg`: gradiente `#E87245` → `#D05F38` (`primary-600/700`), cantos arredondados.
+- `public/brand-mark.svg`: símbolo isolado (transparente) para composição maskable.
+- `scripts/generate-icons.mjs` atualizado: gera `icon-192/512`, `apple-touch-icon`, `favicon-16/32`, `icon-512-maskable` (fundo laranja cheio, não mais azul).
+- `app/layout.tsx`: metadata `icons` inclui favicon 16/32, SVG e PNG 192.
+- `package.json`: script `"icons": "node scripts/generate-icons.mjs"`.
+- PNGs regerados (`npm run icons`). Build OK local. **NÃO commitado/deployado ainda.**
+
+**Contexto visual (sessões anteriores, já no código):**
+- Login `lg+`: layout duas colunas (notebook) — hero à esquerda, formulário à direita.
+- Home sem dia aberto: hero com foto `public/home-hero.png` + gradiente escuro (substitui bloco laranja sólido).
+
 ## 15. Estado atual
 
 ```
@@ -605,30 +630,32 @@ Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): mig
 Funcionalidades operacionais completas (abertura → fechamento). Impressão web (preview + comanda/complemento) OK;
 transporte físico da impressora ainda por definir.
 
-ALTERAÇÕES LOCAIS RECENTES (19/08/2026 sessão 2 — NÃO commitadas/deployadas):
+ALTERAÇÕES LOCAIS RECENTES (20/08/2026 — NÃO commitadas/deployadas):
+- Correção input de quantidade em /abrir-dia (estoque inicial): apagar/digitar normalmente.
+- Favicon + ícones PWA alinhados à marca (BrandMarkIcon, gradiente laranja, favicon-16/32, maskable laranja).
+- Script `npm run icons` para regerar PNGs a partir de `public/icon.svg`.
+
+ALTERAÇÕES LOCAIS ANTERIORES (19/08/2026 sessão 2 — podem estar parcialmente commitadas):
 - Design system `sk-*` + padding lateral + PageShell em todas as telas internas.
 - Home com Realtime (`home-dashboard.tsx`), saudação dinâmica, grid Ações inclui Usuários.
 - Gestão de usuários `/usuarios` (criar, e-mail, papel, senha) via Admin API server-side.
 - `.env.example` atualizado com `SUPABASE_SERVICE_ROLE_KEY`.
-- Correções UX: login, rodapé novo pedido, caixa (Pix-only), Realtime home/pedidos.
-- Login: removido aviso "Acesso restrito · usuários criados pelo administrador".
+- Correções UX: login (layout notebook lg+), home hero com foto, rodapé novo pedido, caixa (Pix-only), Realtime home/pedidos.
 
 ÚLTIMA ETAPA CONCLUÍDA:
-Design system unificado + gestão de usuários no app + correções de UX/Realtime — build OK local.
+Correção UX abertura do dia (qty) + favicon/PWA com identidade visual da marca — build OK local.
 
 PRÓXIMA ETAPA:
 1) Configurar `SUPABASE_SERVICE_ROLE_KEY` no Vercel (Production) para gestão de usuários em produção.
 2) Commit + deploy manual das alterações locais (usuário fará pelo terminal).
-3) Regerar ícones PNG do PWA (`node scripts/generate-icons.mjs`) se quiser ícone laranja no celular.
-4) Transporte físico REAL da impressora (rede/web-bluetooth/usb) — depende do modelo escolhido.
-5) Operação real com múltiplos atendentes (validar fluxo completo).
+3) Transporte físico REAL da impressora (rede/web-bluetooth/usb) — depende do modelo escolhido.
+4) Operação real com múltiplos atendentes (validar fluxo completo).
 
 PROBLEMAS PENDENTES:
-- Alterações locais **NÃO commitadas/deployadas**.
+- Alterações locais **NÃO commitadas/deployadas** (inclui qty abrir-dia + favicon/PWA).
 - `SUPABASE_SERVICE_ROLE_KEY` obrigatória localmente e no Vercel para criar/redefinir usuários pelo app.
 - Tela `/estoque` sem Realtime (recarregar para ver ajuste de outro atendente).
 - Relatório não detalha vendas por atendente (dado `payments.created_by` existe no banco).
-- Ícones PNG do PWA podem estar na cor azul antiga — regerar via `scripts/generate-icons.mjs`.
 - Modelo/método da impressora INDEFINIDO (fluxo web OK; transporte real por definir — seção 11).
 - PERFORMANCE: bundle client, loading/skeleton e índices pendentes.
 - Erros TypeScript pré-existentes em alguns arquivos (`printer-config-form`, `transports.ts`) — não bloqueiam dev.

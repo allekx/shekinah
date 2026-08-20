@@ -29,11 +29,16 @@ export default function OpenDayForm({
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [cash, setCash] = useState("");
 
-  // Quantidade de um produto (default 0)
   const qty = (id: number) => quantities[id] ?? 0;
 
   const setQty = (id: number, value: number) => {
     setQuantities((prev) => ({ ...prev, [id]: Math.max(0, value) }));
+  };
+
+  const parseQtyInput = (raw: string) => {
+    const digits = raw.replace(/\D/g, "");
+    if (digits === "") return 0;
+    return Number(digits);
   };
 
   const formatCurrency = (value: number) =>
@@ -72,7 +77,9 @@ export default function OpenDayForm({
               {category}
             </h2>
             <ul className="space-y-2">
-              {list.map((p) => (
+              {list.map((p) => {
+                const n = qty(p.id);
+                return (
                 <li
                   key={p.id}
                   className="sk-list-row flex items-center justify-between gap-3 px-3 py-2"
@@ -89,25 +96,25 @@ export default function OpenDayForm({
                   <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setQty(p.id, qty(p.id) - 1)}
+                      onClick={() => setQty(p.id, n - 1)}
                       className="sk-qty-btn h-9 w-9"
                       aria-label={`Diminuir ${p.name}`}
                     >
                       −
                     </button>
                     <input
-                      type="number"
+                      type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       name="quantity"
-                      value={qty(p.id)}
-                      onChange={(e) =>
-                        setQty(p.id, Number(e.target.value) || 0)
-                      }
+                      value={n === 0 ? "" : String(n)}
+                      placeholder="0"
+                      onChange={(e) => setQty(p.id, parseQtyInput(e.target.value))}
                       className="sk-qty-input h-9 w-14"
                     />
                     <button
                       type="button"
-                      onClick={() => setQty(p.id, qty(p.id) + 1)}
+                      onClick={() => setQty(p.id, n + 1)}
                       className="sk-qty-btn h-9 w-9"
                       aria-label={`Aumentar ${p.name}`}
                     >
@@ -117,7 +124,8 @@ export default function OpenDayForm({
                     <input type="hidden" name="product_id" value={p.id} />
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </section>
         ))}

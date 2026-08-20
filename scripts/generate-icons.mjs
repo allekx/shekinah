@@ -1,5 +1,5 @@
 // ============================================================
-// Gera os ícones PNG do PWA a partir do icon.svg (via sharp).
+// Gera ícones PNG/PWA a partir do icon.svg (via sharp).
 // Uso: node scripts/generate-icons.mjs
 // ============================================================
 import sharp from "sharp";
@@ -10,19 +10,45 @@ const outDir = path.join(process.cwd(), "public");
 mkdirSync(outDir, { recursive: true });
 
 const src = path.join(outDir, "icon.svg");
+const mark = path.join(outDir, "brand-mark.svg");
 
-// ícone normal (com cantos arredondados do próprio SVG)
-await sharp(src).resize(192, 192).png().toFile(path.join(outDir, "icon-192.png"));
-await sharp(src).resize(512, 512).png().toFile(path.join(outDir, "icon-512.png"));
+const PRIMARY_600 = "#E87245";
+const PRIMARY_700 = "#D05F38";
 
-// maskable: amplia o conteúdo para área segura (80%) sobre fundo azul cheio
-await sharp(src)
-  .resize(512, 512)
-  .flatten({ background: "#2563eb" })
+const maskableBg = (size) =>
+  Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="${size}" y2="${size}" gradientUnits="userSpaceOnUse">
+      <stop stop-color="${PRIMARY_600}"/>
+      <stop stop-color="${PRIMARY_700}"/>
+    </linearGradient>
+  </defs>
+  <rect width="${size}" height="${size}" fill="url(#g)"/>
+</svg>`);
+
+const sizes = [
+  { name: "icon-192.png", size: 192 },
+  { name: "icon-512.png", size: 512 },
+  { name: "apple-touch-icon.png", size: 180 },
+  { name: "favicon-32.png", size: 32 },
+  { name: "favicon-16.png", size: 16 },
+];
+
+for (const { name, size } of sizes) {
+  await sharp(src).resize(size, size).png().toFile(path.join(outDir, name));
+}
+
+// maskable: fundo laranja cheio + símbolo na área segura (~80%)
+const maskableSize = 512;
+const markSize = Math.round(maskableSize * 0.52);
+const markPad = Math.round((maskableSize - markSize) / 2);
+const markPng = await sharp(mark).resize(markSize, markSize).png().toBuffer();
+
+await sharp(maskableBg(maskableSize))
+  .composite([{ input: markPng, left: markPad, top: markPad }])
   .png()
   .toFile(path.join(outDir, "icon-512-maskable.png"));
 
-// apple-touch-icon (iOS)
-await sharp(src).resize(180, 180).png().toFile(path.join(outDir, "apple-touch-icon.png"));
-
-console.log("Ícones PWA gerados em public/: icon-192.png, icon-512.png, icon-512-maskable.png, apple-touch-icon.png");
+console.log(
+  "Ícones gerados em public/: icon-192.png, icon-512.png, icon-512-maskable.png, apple-touch-icon.png, favicon-16.png, favicon-32.png"
+);
