@@ -72,118 +72,148 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
-/** Tela de LOGIN — visual moderno (mesma autenticação). */
+const HIGHLIGHTS = [
+  "Pedidos e atendimento",
+  "Cozinha em tempo real",
+  "Caixa e fechamento do dia",
+];
+
+/** Tela de LOGIN — mobile empilhado; notebook em duas colunas. */
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, {});
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <main className="relative flex min-h-screen flex-col bg-[var(--background)] px-5 md:justify-center md:px-6 md:py-10 lg:px-8">
-      <section className="relative shrink-0 overflow-hidden px-6 pt-12 pb-28 md:mx-auto md:max-w-md md:w-full md:rounded-[2rem] md:pb-20 md:shadow-[var(--shadow-pop)] lg:max-w-lg">
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-500 to-primary-300"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full bg-white/10 blur-2xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute top-24 -left-8 h-40 w-40 rounded-full bg-primary-300/35 blur-2xl"
-          aria-hidden
-        />
+    <main className="min-h-screen bg-[var(--background)]">
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        {/* Hero — esquerda no notebook, topo no celular */}
+        <section className="relative shrink-0 overflow-hidden px-6 pt-12 pb-28 lg:flex lg:w-[min(52%,640px)] lg:shrink-0 lg:flex-col lg:justify-center lg:px-12 lg:py-16 xl:px-16">
+          <div
+            className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-500 to-primary-300 lg:rounded-none"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full bg-white/10 blur-2xl lg:-right-20 lg:h-72 lg:w-72"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute top-24 -left-8 h-40 w-40 rounded-full bg-primary-300/35 blur-2xl lg:bottom-12 lg:top-auto lg:left-1/4 lg:h-56 lg:w-56"
+            aria-hidden
+          />
 
-        <div className="relative">
-          <div className="mb-10">
-            <BrandWordmark variant="light" iconSize="md" />
-          </div>
-
-          <h1 className="max-w-xs text-[2rem] leading-tight font-bold tracking-tight text-white">
-            Gestão do seu dia
-          </h1>
-          <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/80">
-            Pedidos, cozinha e caixa em um só lugar
-          </p>
-        </div>
-      </section>
-
-      <section className="relative -mt-16 flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-6 pt-8 pb-8 shadow-[0_-12px_40px_rgb(23_25_35_/_0.08)] md:mx-auto md:mt-0 md:max-w-md md:flex-none md:rounded-[2rem] md:shadow-[var(--shadow-pop)] lg:max-w-lg">
-        <h2 className="mb-7 text-xl font-bold tracking-tight text-neutral-900">
-          Entrar no sistema
-        </h2>
-
-        <form action={formAction} className="space-y-5">
-          <div>
-            <label htmlFor="email" className="sr-only">
-              E-mail
-            </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-primary-500">
-                <MailIcon />
-              </span>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="username"
-                required
-                placeholder="usuario@shekinah.com"
-                className="sk-input-soft sk-input-soft--icon-start h-14"
-              />
+          <div className="relative mx-auto w-full max-w-lg lg:max-w-none">
+            <div className="mb-8 lg:mb-12">
+              <BrandWordmark variant="light" iconSize="md" />
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="password" className="sr-only">
-              Senha
-            </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-primary-500">
-                <LockIcon />
-              </span>
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                placeholder="••••••••"
-                className="sk-input-soft sk-input-soft--icon-start sk-input-soft--icon-end h-14"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute top-1/2 right-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-neutral-400 transition hover:text-neutral-600 active:bg-neutral-100"
-                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-              >
-                <EyeIcon open={showPassword} />
-              </button>
-            </div>
-          </div>
-
-          {state?.error && (
-            <p role="alert" className="sk-alert-error">
-              {state.error}
+            <h1 className="max-w-md text-[2rem] leading-tight font-bold tracking-tight text-white lg:text-[2.75rem] xl:text-[3rem]">
+              Gestão do seu dia
+            </h1>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 lg:mt-4 lg:text-base lg:leading-relaxed">
+              Pedidos, cozinha e caixa em um só lugar
             </p>
-          )}
 
-          <button
-            type="submit"
-            disabled={pending}
-            className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-600 text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-500/30 transition hover:from-primary-600 hover:to-primary-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:from-neutral-300 disabled:to-neutral-300 disabled:shadow-none"
-          >
-            {pending ? (
-              <>
-                <span className="sk-spinner" aria-hidden="true" />
-                Entrando…
-              </>
-            ) : (
-              "Entrar"
-            )}
-          </button>
-        </form>
-      </section>
+            <ul className="mt-8 hidden gap-3 lg:grid lg:grid-cols-1 xl:grid-cols-3 xl:gap-4">
+              {HIGHLIGHTS.map((label) => (
+                <li
+                  key={label}
+                  className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-sm"
+                >
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/90"
+                    aria-hidden
+                  />
+                  <span className="text-sm font-medium text-white/95">{label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Formulário — direita no notebook */}
+        <section className="relative -mt-16 flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-6 pt-8 pb-10 shadow-[0_-12px_40px_rgb(23_25_35_/_0.08)] lg:mt-0 lg:min-w-0 lg:flex-1 lg:justify-center lg:rounded-none lg:bg-neutral-50/80 lg:px-10 lg:py-12 lg:shadow-none xl:px-16">
+          <div className="mx-auto w-full max-w-md lg:rounded-[1.75rem] lg:border lg:border-neutral-200/80 lg:bg-white lg:p-8 lg:shadow-[var(--shadow-pop)] xl:max-w-lg xl:p-10">
+            <h2 className="mb-2 text-xl font-bold tracking-tight text-neutral-900 lg:text-2xl">
+              Entrar no sistema
+            </h2>
+            <p className="mb-7 text-sm text-neutral-500">
+              Use seu e-mail e senha de acesso
+            </p>
+
+            <form action={formAction} className="space-y-5">
+              <div>
+                <label htmlFor="email" className="sr-only">
+                  E-mail
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-primary-500">
+                    <MailIcon />
+                  </span>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="username"
+                    required
+                    placeholder="usuario@shekinah.com"
+                    className="sk-input-soft sk-input-soft--icon-start h-14"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="sr-only">
+                  Senha
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-primary-500">
+                    <LockIcon />
+                  </span>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    placeholder="••••••••"
+                    className="sk-input-soft sk-input-soft--icon-start sk-input-soft--icon-end h-14"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute top-1/2 right-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-neutral-400 transition hover:text-neutral-600 active:bg-neutral-100"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
+              </div>
+
+              {state?.error && (
+                <p role="alert" className="sk-alert-error">
+                  {state.error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={pending}
+                className="mt-2 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-600 text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-500/30 transition hover:from-primary-600 hover:to-primary-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:from-neutral-300 disabled:to-neutral-300 disabled:shadow-none"
+              >
+                {pending ? (
+                  <>
+                    <span className="sk-spinner" aria-hidden="true" />
+                    Entrando…
+                  </>
+                ) : (
+                  "Entrar"
+                )}
+              </button>
+            </form>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
