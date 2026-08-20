@@ -69,30 +69,60 @@ export default async function HomePage() {
   // ---------- SEM DIA ABERTO ----------
   if (!day) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center px-6 text-center">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-b from-[#3f6ee0] to-[#2844a8] text-3xl shadow-lg shadow-[#2e54c9]/25">
-          <span>🌅</span>
-        </div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900">Bom dia!</h1>
-        <p className="mt-2 max-w-xs text-sm text-neutral-500">
-          Nenhum dia aberto. Para registrar pedidos, vendas e caixa, inicie o dia de operação.
-        </p>
-        <a
-          href="/abrir-dia"
-          className="sk-btn-primary mt-8 w-full max-w-sm py-5 text-lg"
-        >
-          INICIAR DIA
-        </a>
-        <p className="mt-6 text-xs text-neutral-400">Acesso restrito</p>
+      <div className="-mx-4 flex min-h-[calc(100dvh-4.5rem)] flex-col bg-white">
+        <section className="relative shrink-0 overflow-hidden px-6 pt-6 pb-24">
+          <div
+            className="absolute inset-0 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-400"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -top-10 -right-8 h-44 w-44 rounded-full bg-white/10 blur-2xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute top-16 -left-6 h-32 w-32 rounded-full bg-primary-300/20 blur-2xl"
+            aria-hidden
+          />
+
+          <div className="relative">
+            <h1 className="max-w-xs text-[2rem] leading-tight font-bold tracking-tight text-white">
+              Bom dia!
+            </h1>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/80">
+              Nenhum dia aberto. Para registrar pedidos, vendas e caixa, inicie
+              o dia de operação.
+            </p>
+          </div>
+        </section>
+
+        <section className="relative -mt-14 flex flex-1 flex-col rounded-t-[2.5rem] bg-white px-6 pt-8 pb-8 shadow-[0_-12px_40px_rgb(23_25_35_/_0.08)]">
+          <h2 className="mb-2 text-xl font-bold tracking-tight text-neutral-900">
+            Pronto para começar?
+          </h2>
+          <p className="mb-7 text-sm leading-relaxed text-neutral-500">
+            Informe o estoque inicial e o caixa para abrir o dia de operação.
+          </p>
+
+          <a
+            href="/abrir-dia"
+            className="flex h-14 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-primary-500 to-primary-700 text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-600/25 transition hover:from-primary-600 hover:to-primary-800 active:scale-[0.99]"
+          >
+            Iniciar dia
+          </a>
+
+          <p className="mt-auto pt-10 text-center text-xs text-neutral-400">
+            Acesso restrito
+          </p>
+        </section>
       </div>
     );
   }
 
   // ---------- COM DIA ABERTO ----------
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-5 pb-8 pt-4">
       {/* Status do dia */}
-      <section className="rounded-[1.25rem] bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 p-5 text-white shadow-[0_10px_30px_rgb(23_25_35_/0.18)]">
+      <section className="overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-700 via-primary-600 to-primary-500 p-5 text-white shadow-lg shadow-primary-600/20">
         <div className="flex items-center justify-between">
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-300">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Em andamento
@@ -107,19 +137,19 @@ export default async function HomePage() {
 
         {/* métricas principais */}
         <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <div className="rounded-xl bg-white/[0.07] p-3.5 ring-1 ring-white/10">
+          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
             <p className="sk-figure text-2xl text-white">{ordersCount}</p>
             <p className="text-[11px] font-medium text-neutral-300">Pedidos hoje</p>
           </div>
-          <div className="rounded-xl bg-white/[0.07] p-3.5 ring-1 ring-white/10">
+          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
             <p className="sk-figure text-2xl text-white">{fmtBRL(salesToday)}</p>
             <p className="text-[11px] font-medium text-neutral-300">Vendas hoje</p>
           </div>
-          <div className="rounded-xl bg-white/[0.07] p-3.5 ring-1 ring-white/10">
+          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
             <p className="sk-figure text-2xl text-white">{preparingCount}</p>
             <p className="text-[11px] font-medium text-neutral-300">Em preparo</p>
           </div>
-          <div className="rounded-xl bg-white/[0.07] p-3.5 ring-1 ring-white/10">
+          <div className="sk-card bg-white/5 ring-1 ring-white/10 p-3.5">
             <p className="sk-figure text-2xl text-emerald-300">{readyCount}</p>
             <p className="text-[11px] font-medium text-neutral-300">Prontos</p>
           </div>
@@ -129,16 +159,16 @@ export default async function HomePage() {
       {/* Ação principal: NOVO PEDIDO */}
       <a
         href="/pedidos/novo"
-        className="block rounded-[1.25rem] bg-gradient-to-b from-[#2e54c9] to-[#2844a8] py-6 text-center text-lg font-extrabold tracking-tight text-white shadow-lg shadow-[#2e54c9]/25 transition hover:from-[#3163d4] hover:to-[#2844a8] active:scale-[.985]"
+        className="block rounded-2xl bg-gradient-to-r from-primary-500 to-primary-700 py-6 text-center text-sm font-bold tracking-[0.12em] text-white uppercase shadow-lg shadow-primary-600/25 transition hover:from-primary-600 hover:to-primary-800 active:scale-[0.99]"
       >
-        ＋ NOVO PEDIDO
+        ＋ Novo pedido
       </a>
 
       {/* Estoque baixo */}
       <section className="sk-card p-4">
         <h2 className="sk-section-title mb-3">Estoque baixo</h2>
         {lowStock.length === 0 ? (
-          <p className="py-2 text-center text-sm text-neutral-400">Nenhum produto com estoque baixo 🎉</p>
+          <p className="py-2 text-center text-sm sk-text-muted">Nenhum produto com estoque baixo 🎉</p>
         ) : (
           <ul className="divide-y divide-neutral-100">
             {lowStock.map((s) => (
@@ -170,9 +200,9 @@ export default async function HomePage() {
             <a
               key={a.href}
               href={a.href}
-              className={`flex items-center justify-center gap-2 rounded-[1rem] p-5 text-center text-base font-bold shadow-sm transition active:scale-[.98] ${
+              className={`flex items-center justify-center gap-2 rounded-xl p-5 text-center text-base font-bold shadow-sm transition active:scale-[.98] ${
                 a.danger
-                  ? "border border-red-100 bg-red-50 text-red-700 hover:bg-red-100"
+                  ? "sk-card border-red-100 bg-red-50 text-red-700 hover:bg-red-100"
                   : "sk-card sk-card--interactive text-neutral-800"
               }`}
             >

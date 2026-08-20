@@ -24,29 +24,25 @@ export default function ProductList({ products }: { products: Product[] }) {
     }).format(v);
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-neutral-500">
-        Lista de produtos
-      </h2>
+    <section className="sk-card p-4">
+      <h2 className="mb-3 sk-section-title">Lista de produtos</h2>
 
       {error && (
-        <p role="alert" className="mb-3 rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
-          {error}
-        </p>
+        <p role="alert" className="mb-3 sk-alert-error">{error}</p>
       )}
 
-      <ul className="divide-y divide-neutral-100">
+      <ul className="divide-y divide-neutral-200">
         {products.length === 0 && (
-          <li className="py-4 text-center text-sm text-neutral-400">
+          <li className="py-4 text-center text-sm sk-text-muted">
             Nenhum produto cadastrado.
           </li>
         )}
 
         {products.map((p) => (
-          <li key={p.id} className="flex items-center justify-between gap-3 py-3">
+          <li key={p.id} className="py-3">
             {editingId === p.id ? (
               <form
-                className="flex flex-1 flex-wrap items-center gap-2"
+                className="space-y-3"
                 action={async (formData) => {
                   const res = await updateProduct(formData);
                   setError(res?.error ?? null);
@@ -54,42 +50,59 @@ export default function ProductList({ products }: { products: Product[] }) {
                 }}
               >
                 <input type="hidden" name="id" value={p.id} />
-                <input
-                  name="name"
-                  defaultValue={p.name}
-                  required
-                  className="h-10 flex-1 rounded-lg border border-neutral-300 px-3 text-sm outline-none focus:border-blue-500"
-                />
-                <input
-                  name="category"
-                  defaultValue={p.category ?? ""}
-                  placeholder="Categoria"
-                  className="h-10 w-28 rounded-lg border border-neutral-300 px-3 text-sm outline-none focus:border-blue-500"
-                />
-                <input
-                  name="unit_price"
-                  type="number"
-                  step="0.01"
-                  defaultValue={p.unit_price}
-                  className="h-10 w-20 rounded-lg border border-neutral-300 px-2 text-sm font-bold outline-none focus:border-blue-500"
-                />
-                <label className="flex items-center gap-1 text-xs text-neutral-600">
-                  <input type="checkbox" name="tracks_stock" defaultChecked={p.tracks_stock} /> estoque
-                </label>
-                <label className="flex items-center gap-1 text-xs text-neutral-600">
-                  <input type="checkbox" name="active" defaultChecked={p.active} /> ativo
-                </label>
-                <div className="flex gap-1">
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white"
-                  >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor={`name-${p.id}`} className="sk-label">Nome</label>
+                    <input
+                      id={`name-${p.id}`}
+                      name="name"
+                      defaultValue={p.name}
+                      required
+                      className="sk-input"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor={`category-${p.id}`} className="sk-label">Categoria</label>
+                    <input
+                      id={`category-${p.id}`}
+                      name="category"
+                      defaultValue={p.category ?? ""}
+                      placeholder="Categoria"
+                      className="sk-input"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor={`price-${p.id}`} className="sk-label">Preço (R$)</label>
+                    <input
+                      id={`price-${p.id}`}
+                      name="unit_price"
+                      type="number"
+                      step="0.01"
+                      defaultValue={p.unit_price}
+                      className="sk-input font-bold tabular-nums"
+                    />
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                      <input type="checkbox" name="tracks_stock" defaultChecked={p.tracks_stock} className="h-4 w-4 accent-primary-600" />
+                      Controla estoque
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-neutral-700">
+                      <input type="checkbox" name="active" defaultChecked={p.active} className="h-4 w-4 accent-primary-600" />
+                      Ativo
+                    </label>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="sk-btn-primary">
                     Salvar
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingId(null)}
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-xs font-bold text-neutral-600"
+                    className="sk-btn-secondary"
                   >
                     Cancelar
                   </button>
@@ -97,42 +110,38 @@ export default function ProductList({ products }: { products: Product[] }) {
               </form>
             ) : (
               <>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-neutral-900">
-                    {p.name}{" "}
-                    {!p.active && (
-                      <span className="ml-1 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-bold text-neutral-600">
-                        inativo
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {p.category ?? "Sem categoria"} · {fmt(Number(p.unit_price))}
-                    {p.tracks_stock ? " · estoque" : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <form action={toggleProductActive}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="active" value={String(!p.active)} />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-neutral-900">
+                      {p.name}{" "}
+                      {!p.active && (
+                        <span className="sk-badge sk-badge--neutral">inativo</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      {p.category ?? "Sem categoria"} · {fmt(Number(p.unit_price))}
+                      {p.tracks_stock ? " · estoque" : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <form action={toggleProductActive}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <input type="hidden" name="active" value={String(!p.active)} />
+                      <button
+                        type="submit"
+                        className={`sk-btn ${p.active ? "sk-btn-ghost text-red-600 hover:bg-red-50" : "sk-btn-ghost text-green-600 hover:bg-green-50"}`}
+                      >
+                        {p.active ? "Desativar" : "Ativar"}
+                      </button>
+                    </form>
                     <button
-                      type="submit"
-                      className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${
-                        p.active
-                          ? "bg-red-50 text-red-700"
-                          : "bg-green-50 text-green-700"
-                      }`}
+                      type="button"
+                      onClick={() => setEditingId(p.id)}
+                      className="sk-btn-ghost"
                     >
-                      {p.active ? "Desativar" : "Ativar"}
+                      Editar
                     </button>
-                  </form>
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(p.id)}
-                    className="rounded-lg bg-neutral-100 px-2.5 py-1.5 text-xs font-bold text-neutral-700"
-                  >
-                    Editar
-                  </button>
+                  </div>
                 </div>
               </>
             )}

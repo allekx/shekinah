@@ -137,19 +137,19 @@ export default function AddItemsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-900/60 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <div>
             <p className="text-sm font-bold text-neutral-800">Adicionar itens</p>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs sk-text-muted">
               Pedido #{order.number} · {order.customer_name ?? "Cliente"}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-neutral-100 px-2.5 py-1 text-xs font-bold text-neutral-600"
+            className="sk-btn-ghost text-xs"
           >
             ✕
           </button>
@@ -157,11 +157,11 @@ export default function AddItemsModal({
 
         {/* Itens atuais (resumo) */}
         <div className="border-b border-neutral-100 bg-neutral-50 px-4 py-3">
-          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-neutral-500">
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wide sk-text-muted">
             Itens atuais · total {fmtBRL(order.total)}
           </p>
           <ul className="space-y-0.5">
-            {order.items.length === 0 && <li className="text-xs text-neutral-400">Sem itens</li>}
+            {order.items.length === 0 && <li className="text-xs sk-text-muted">Sem itens</li>}
             {order.items.map((it, i) => (
               <li key={i} className="flex justify-between text-sm text-neutral-700">
                 <span>
@@ -187,19 +187,19 @@ export default function AddItemsModal({
                   return (
                     <li
                       key={p.id}
-                      className={`rounded-xl border px-3 py-2 ${
-                        soldOut ? "border-neutral-200 bg-neutral-50 opacity-60" : "border-neutral-200"
+                      className={`sk-card p-3 ${
+                        soldOut ? "opacity-60" : ""
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-neutral-900">{p.name}</p>
-                          <p className="text-xs text-neutral-500">
+                          <p className="text-xs sk-text-muted">
                             {fmtBRL(p.unit_price)}
                             {p.available !== null && (
                               <span className="ml-1">
                                 {soldOut ? (
-                                  <span className="font-bold text-red-500">ESGOTADO</span>
+                                  <span className="sk-badge sk-badge--danger">ESGOTADO</span>
                                 ) : (
                                   <>· disp. {p.available}</>
                                 )}
@@ -248,25 +248,21 @@ export default function AddItemsModal({
         {/* Rodapé: total adicional + ações */}
         <div className="border-t border-neutral-200 px-4 py-3">
           {error && (
-            <p role="alert" className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-              {error}
-            </p>
+            <p role="alert" className="mb-2 sk-alert-error">{error}</p>
           )}
           {success && (
-            <p className="mb-2 rounded-xl bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
-              Itens adicionados ao pedido.
-            </p>
+            <p className="mb-2 sk-alert-success">Itens adicionados ao pedido.</p>
           )}
           <div className="flex items-center justify-between py-1">
-            <span className="text-sm text-neutral-500">Total adicional</span>
-            <span className="text-lg font-black text-neutral-900">{fmtBRL(addTotal)}</span>
+            <span className="text-sm sk-text-muted">Total adicional</span>
+            <span className="text-lg font-black text-neutral-900 tabular-nums">{fmtBRL(addTotal)}</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={pending}
-              className="rounded-xl border border-neutral-300 py-3 text-center text-sm font-bold text-neutral-700 active:bg-neutral-100 disabled:opacity-50"
+              className="sk-btn-secondary"
             >
               Cancelar
             </button>
@@ -274,7 +270,7 @@ export default function AddItemsModal({
               type="button"
               onClick={confirm}
               disabled={!canAdd || pending}
-              className="rounded-xl bg-blue-600 py-3 text-center text-sm font-bold text-white active:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="sk-btn-primary"
             >
               {pending ? "Adicionando…" : "Adicionar ao pedido"}
             </button>

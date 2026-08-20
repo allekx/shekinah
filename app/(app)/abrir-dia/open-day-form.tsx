@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { openDay, type OpenDayResult } from "@/lib/auth/open-day";
 import BackButton from "@/components/back-button";
+import OpenDayAddProduct from "./open-day-add-product";
 
 interface Product {
   id: number;
@@ -14,7 +15,13 @@ interface Product {
 /** Formulário de abertura do dia: grade de estoque inicial + caixa inicial.
  *  Controles simples [-] qty [+] para digitação rápida no celular.
  */
-export default function OpenDayForm({ products }: { products: Product[] }) {
+export default function OpenDayForm({
+  products,
+  categories,
+}: {
+  products: Product[];
+  categories: string[];
+}) {
   const [state, formAction, pending] = useActionState<OpenDayResult, FormData>(
     openDay,
     {}
@@ -42,6 +49,19 @@ export default function OpenDayForm({ products }: { products: Product[] }) {
     return acc;
   }, {});
 
+  const categoryRank = (category: string) => {
+    const name = category.toLowerCase();
+    if (name === "pratos") return 0;
+    if (name === "bebidas") return 1;
+    return 2;
+  };
+
+  const sortedCategories = Object.entries(byCategory).sort(([a], [b]) => {
+    const diff = categoryRank(a) - categoryRank(b);
+    if (diff !== 0) return diff;
+    return a.localeCompare(b, "pt-BR");
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
@@ -56,7 +76,7 @@ export default function OpenDayForm({ products }: { products: Product[] }) {
 
       <form action={formAction} className="space-y-6">
         {/* Grade de estoque por categoria */}
-        {Object.entries(byCategory).map(([category, list]) => (
+        {sortedCategories.map(([category, list]) => (
           <section key={category} className="sk-card p-4">
             <h2 className="mb-3 sk-section-title">
               {category}
@@ -111,6 +131,8 @@ export default function OpenDayForm({ products }: { products: Product[] }) {
             </ul>
           </section>
         ))}
+
+        <OpenDayAddProduct categories={categories} />
 
         {/* Caixa inicial */}
         <section className="sk-card p-4">

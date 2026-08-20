@@ -23,12 +23,12 @@ export default async function AppLayout({
   const role = (await getRole()) ?? "cozinha";
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-50">
+    <div className="flex min-h-screen flex-col bg-white">
       <SessionHeader
         email={user.email ?? ""}
         role={role}
       />
-      <main className="mx-auto w-full max-w-md flex-1 px-4 pb-16 pt-4">
+      <main className="mx-auto w-full max-w-md flex-1 px-4 pb-16 pt-0">
         {children}
       </main>
     </div>

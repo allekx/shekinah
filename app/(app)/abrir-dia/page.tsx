@@ -36,5 +36,26 @@ export default async function AbrirDiaPage() {
 
   const tracked = (products ?? []).filter((p) => p.tracks_stock);
 
-  return <OpenDayForm products={tracked} />;
+  const categoryRank = (name: string) => {
+    const key = name.toLowerCase();
+    if (key === "pratos") return 0;
+    if (key === "bebidas") return 1;
+    return 2;
+  };
+
+  const categories = [
+    ...new Set([
+      "Pratos",
+      "Bebidas",
+      ...tracked
+        .map((p) => p.category)
+        .filter((c): c is string => Boolean(c?.trim())),
+    ]),
+  ].sort((a, b) => {
+    const diff = categoryRank(a) - categoryRank(b);
+    if (diff !== 0) return diff;
+    return a.localeCompare(b, "pt-BR");
+  });
+
+  return <OpenDayForm products={tracked} categories={categories} />;
 }

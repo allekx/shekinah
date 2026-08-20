@@ -39,6 +39,7 @@ export async function createProduct(formData: FormData): Promise<ProductActionRe
   }
 
   revalidatePath("/produtos", "layout");
+  revalidatePath("/abrir-dia");
   return {};
 }
 

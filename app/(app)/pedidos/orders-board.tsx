@@ -37,14 +37,14 @@ interface ColumnDef {
   key: string;
   label: string;
   dot: string;
-  ring: string;
+  badge: string;
 }
 
 const COLUMNS: ColumnDef[] = [
-  { key: "novo", label: "NOVOS", dot: "bg-red-500", ring: "border-red-200" },
-  { key: "em_preparo", label: "EM PREPARO", dot: "bg-amber-500", ring: "border-amber-300" },
-  { key: "pronto", label: "PRONTOS", dot: "bg-green-500", ring: "border-green-300" },
-  { key: "entregue", label: "FINALIZADOS", dot: "bg-neutral-400", ring: "border-neutral-200" },
+  { key: "novo", label: "NOVOS", dot: "bg-red-500", badge: "sk-badge--danger" },
+  { key: "em_preparo", label: "EM PREPARO", dot: "bg-amber-500", badge: "sk-badge--warn" },
+  { key: "pronto", label: "PRONTOS", dot: "bg-green-500", badge: "sk-badge--success" },
+  { key: "entregue", label: "FINALIZADOS", dot: "bg-neutral-400", badge: "sk-badge--neutral" },
 ];
 
 const statusLabel: Record<string, string> = {
@@ -60,6 +60,13 @@ const statusDot: Record<string, string> = {
   pronto: "bg-green-500",
   entregue: "bg-neutral-400",
   cancelado: "bg-neutral-300",
+};
+const statusBadge: Record<string, string> = {
+  novo: "sk-badge--danger",
+  em_preparo: "sk-badge--warn",
+  pronto: "sk-badge--success",
+  entregue: "sk-badge--neutral",
+  cancelado: "sk-badge--neutral",
 };
 
 const fmtBRL = (v: number) =>
@@ -165,9 +172,7 @@ export default function OrdersBoard({
   return (
     <div className="space-y-5">
       {actionError && (
-        <p role="alert" className="rounded-xl bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
-          {actionError}
-        </p>
+        <p role="alert" className="sk-alert-error">{actionError}</p>
       )}
       <header className="flex items-center gap-3">
         <BackButton />
@@ -195,12 +200,12 @@ export default function OrdersBoard({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {COLUMNS.map((col) => {
           const list = byStatus(col.key);
-          const prontoTotal = list.filter((o) => o.status === "pronto").length;
           return (
-            <div key={col.key} className={`rounded-2xl bg-white p-3 shadow-[0_2px_10px_rgb(23_25_35_/0.05)] ${col.ring} border-l-4`}>
+            <div key={col.key} className="sk-card p-3">
               <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-neutral-700">
                 <span className={`h-2.5 w-2.5 rounded-full ${col.dot}`} />
-                {col.label} ({list.length})
+                {col.label}
+                <span className={`sk-badge ${col.badge}`}>{list.length}</span>
               </h2>
 
               {list.length === 0 ? (
@@ -210,18 +215,18 @@ export default function OrdersBoard({
                   {list.map((o) => (
                     <li
                       key={o.id}
-                      className={`rounded-xl border p-3 transition ${
+                      className={`sk-card sk-card--interactive p-3 ${
                         o.status === "pronto"
-                          ? "border-green-200 bg-green-50/70"
-                          : "border-neutral-200 bg-white"
-                      } shadow-[0_1px_2px_rgb(23_25_35_/0.04)]`}
+                          ? "border-green-200 bg-green-50/50"
+                          : ""
+                      }`}
                     >
                       {/* Número + horário */}
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-black text-neutral-900">
                           #{o.number}
                         </span>
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold text-white ${statusDot[o.status]}`}>
+                        <span className={`sk-badge ${statusBadge[o.status]}`}>
                           {statusLabel[o.status]}
                         </span>
                       </div>
@@ -247,10 +252,10 @@ export default function OrdersBoard({
 
                       {/* Total */}
                       <div className="mt-2 flex items-center justify-between border-t border-neutral-100 pt-2">
-                        <span className="text-xs text-neutral-500">
+                        <span className="text-xs sk-text-muted">
                           {o.paid ? "Pago" : "A pagar"}
                         </span>
-                        <span className="text-base font-black text-neutral-900">
+                        <span className="text-base font-black text-neutral-900 tabular-nums">
                           {fmtBRL(o.total)}
                         </span>
                       </div>
@@ -262,7 +267,7 @@ export default function OrdersBoard({
                             <button
                               type="button"
                               onClick={() => setAddFor(o)}
-                              className="flex-1 rounded-lg border border-blue-100 bg-blue-50 px-2 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
+                              className="sk-btn-ghost flex-1 text-xs"
                             >
                               ＋ Adicionar itens
                             </button>
@@ -281,7 +286,7 @@ export default function OrdersBoard({
                                 onClick={(e) => {
                                   if (!confirm("Cancelar este pedido? O estoque será devolvido.")) e.preventDefault();
                                 }}
-                                className="w-full rounded-lg border border-red-100 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100"
+                                className="sk-btn-danger w-full text-xs"
                               >
                                 Cancelar
                               </button>
