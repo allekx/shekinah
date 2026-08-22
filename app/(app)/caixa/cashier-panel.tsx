@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import PageShell from "@/components/page-shell";
 import { addPaymentsAction } from "@/lib/auth/cashier";
 import { closeDay } from "@/lib/auth/close-day";
-import { formatMoneyInput, parseMoney } from "@/lib/money";
+import { formatMoneyInput } from "@/lib/money";
+import MoneyInput from "@/components/money-input";
 
 interface CashierProps {
   dayId: string;
@@ -44,21 +45,24 @@ type PayMethod = "dinheiro" | "pix" | "cartao";
 interface PaymentLine {
   id: string;
   method: PayMethod;
-  amount: string;
-  change: string;
+  amount: number | null;
+  change: number | null;
 }
 
 const lineLiquid = (line: PaymentLine) => {
-  const amount = parseMoney(line.amount);
-  const change = line.method === "dinheiro" ? parseMoney(line.change) : 0;
+  const amount = line.amount ?? 0;
+  const change = line.method === "dinheiro" ? line.change ?? 0 : 0;
   return Math.max(0, amount - change);
 };
 
-const newPaymentLine = (method: PayMethod = "dinheiro", amount = ""): PaymentLine => ({
+const newPaymentLine = (
+  method: PayMethod = "dinheiro",
+  amount: number | null = null
+): PaymentLine => ({
   id: crypto.randomUUID(),
   method,
   amount,
-  change: "",
+  change: null,
 });
 
 /** Painel do caixa: receber → resumo → conferência → encerrar dia. */
@@ -73,14 +77,7 @@ export default function CashierPanel({
   const [paymentFor, setPaymentFor] = useState<string | null>(null);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [countedCash, setCountedCash] = useState(() => {
-    const pm0 = (closeout?.payments_by_method as Record<string, number> | undefined) ?? {};
-    const exp =
-      closeout?.expected_cash != null
-        ? Number(closeout.expected_cash)
-        : Number(closeout?.initial_cash ?? 0) + Number(pm0.dinheiro ?? 0);
-    return formatMoneyInput(exp);
-  });
+  const [countedCash, setCountedCash] = useState<number | null>(null);
   const [stockCounted, setStockCounted] = useState<Record<number, number>>({});
   const [pending, setPending] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -98,14 +95,14 @@ export default function CashierPanel({
     [closeout]
   );
 
-  const counted = parseMoney(countedCash);
+  const counted = countedCash ?? 0;
   const difference = counted - expectedCash;
-  const cashFieldEmpty = countedCash.trim() === "";
+  const cashFieldEmpty = countedCash === null;
   const cashOk = !cashFieldEmpty && difference === 0;
 
   const openPayment = (id: string, total: number) => {
     setPaymentFor(id);
-    setPaymentLines([newPaymentLine("dinheiro", formatMoneyInput(total))]);
+    setPaymentLines([newPaymentLine("dinheiro", total)]);
     setError(null);
   };
 
@@ -128,7 +125,7 @@ export default function CashierPanel({
       const nextMethod: PayMethod = prev.some((line) => line.method === "pix")
         ? "dinheiro"
         : "pix";
-      return [...prev, newPaymentLine(nextMethod, remaining > 0 ? formatMoneyInput(remaining) : "")];
+      return [...prev, newPaymentLine(nextMethod, remaining > 0 ? remaining : null)];
     });
   };
 
@@ -163,7 +160,7 @@ export default function CashierPanel({
                   const remaining = o.total - receivedTotal;
                   const canSubmit =
                     paymentLines.length > 0 &&
-                    paymentLines.every((line) => parseMoney(line.amount) > 0) &&
+                    paymentLines.every((line) => (line.amount ?? 0) > 0) &&
                     Math.abs(remaining) < 0.01;
 
                   return (
@@ -210,7 +207,7 @@ export default function CashierPanel({
                                   onClick={() =>
                                     updatePaymentLine(line.id, {
                                       method: value,
-                                      change: value === "dinheiro" ? line.change : "",
+                                      change: value === "dinheiro" ? line.change : null,
                                     })
                                   }
                                   className={`sk-method-chip ${
@@ -224,12 +221,11 @@ export default function CashierPanel({
 
                             <div className="mt-2 flex items-center gap-2">
                               <span className="text-lg font-bold text-neutral-500">R$</span>
-                              <input
+                              <MoneyInput
                                 value={line.amount}
-                                onChange={(e) =>
-                                  updatePaymentLine(line.id, { amount: e.target.value })
+                                onValueChange={(amount) =>
+                                  updatePaymentLine(line.id, { amount })
                                 }
-                                inputMode="decimal"
                                 placeholder="0,00"
                                 className="sk-input h-11 flex-1 text-lg font-bold tabular-nums"
                               />
@@ -240,12 +236,11 @@ export default function CashierPanel({
                                 <label className="mb-1 block text-sm text-neutral-600">
                                   Troco para R$
                                 </label>
-                                <input
+                                <MoneyInput
                                   value={line.change}
-                                  onChange={(e) =>
-                                    updatePaymentLine(line.id, { change: e.target.value })
+                                  onValueChange={(change) =>
+                                    updatePaymentLine(line.id, { change })
                                   }
-                                  inputMode="decimal"
                                   placeholder="0,00"
                                   className="sk-input h-11 w-full text-base font-bold tabular-nums"
                                 />
@@ -303,9 +298,9 @@ export default function CashierPanel({
                               o.id,
                               paymentLines.map((line) => ({
                                 method: line.method,
-                                amount: parseMoney(line.amount),
+                                amount: line.amount ?? 0,
                                 change_given:
-                                  line.method === "dinheiro" ? parseMoney(line.change) : 0,
+                                  line.method === "dinheiro" ? line.change ?? 0 : 0,
                               }))
                             );
                             setError(res.error ?? null);
@@ -383,12 +378,11 @@ export default function CashierPanel({
         </label>
         <div className="flex items-center gap-2">
           <span className="text-xl font-bold text-neutral-500">R$</span>
-          <input
+          <MoneyInput
             value={countedCash}
-            onChange={(e) => setCountedCash(e.target.value)}
-            inputMode="decimal"
+            onValueChange={setCountedCash}
             placeholder="0,00"
-            className="sk-input h-12 text-2xl font-bold tabular-nums"
+            className="sk-input h-12 flex-1 text-2xl font-bold tabular-nums"
           />
         </div>
         <div
@@ -496,7 +490,11 @@ export default function CashierPanel({
             }}
           >
             <input type="hidden" name="day_id" value={dayId} />
-            <input type="hidden" name="counted_cash" value={countedCash} />
+            <input
+              type="hidden"
+              name="counted_cash"
+              value={countedCash === null ? "" : formatMoneyInput(countedCash)}
+            />
             {stock.map((s) => (
               <input key={s.product_id} type="hidden" name="product_id" value={s.product_id} />
             ))}

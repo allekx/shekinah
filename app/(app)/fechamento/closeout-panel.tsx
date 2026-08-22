@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import PageShell from "@/components/page-shell";
 import { SkNavLink } from "@/components/navigation-pending";
 import { closeDay } from "@/lib/auth/close-day";
-import { formatMoneyInput, parseMoney } from "@/lib/money";
+import { formatMoneyInput } from "@/lib/money";
+import MoneyInput from "@/components/money-input";
 
 interface CloseoutProps {
   day: {
@@ -38,14 +39,7 @@ interface StockRow {
 
 /** Painel de fechamento: conferência completa + confirmar + DIA ENCERRADO. */
 export default function CloseoutPanel({ day, closeout, closeoutError, encerrado }: CloseoutProps) {
-  const [countedCash, setCountedCash] = useState(() => {
-    const pm0 = (closeout?.payments_by_method as Record<string, number> | undefined) ?? {};
-    const exp =
-      closeout?.expected_cash != null
-        ? Number(closeout.expected_cash)
-        : Number(closeout?.initial_cash ?? 0) + Number(pm0.dinheiro ?? 0);
-    return formatMoneyInput(exp);
-  });
+  const [countedCash, setCountedCash] = useState<number | null>(null);
   const [stockCounted, setStockCounted] = useState<Record<number, number>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,9 +54,9 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
 
   const stock: StockRow[] = useMemo(() => (closeout?.stock as StockRow[] | undefined) ?? [], [closeout]);
 
-  const counted = parseMoney(countedCash);
+  const counted = countedCash ?? 0;
   const diff = counted - expectedCash;
-  const cashFieldEmpty = countedCash.trim() === "";
+  const cashFieldEmpty = countedCash === null;
   const cashOk = !cashFieldEmpty && diff === 0;
 
   const stockDiffTotal = stock.reduce((acc, s) => {
@@ -148,13 +142,11 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
           <label className="sk-label">Dinheiro contado</label>
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold text-neutral-500">R$</span>
-            <input
-              name="counted_cash"
+            <MoneyInput
               value={countedCash}
-              onChange={(e) => setCountedCash(e.target.value)}
-              inputMode="decimal"
+              onValueChange={setCountedCash}
               placeholder="0,00"
-              className="sk-input h-12 text-xl font-bold tabular-nums"
+              className="sk-input h-12 flex-1 text-xl font-bold tabular-nums"
             />
           </div>
           {(!cashFieldEmpty || expectedCash === 0) && (
@@ -278,7 +270,11 @@ export default function CloseoutPanel({ day, closeout, closeoutError, encerrado 
             }}
           >
             <input type="hidden" name="day_id" value={day.id} />
-            <input type="hidden" name="counted_cash" value={countedCash} />
+            <input
+              type="hidden"
+              name="counted_cash"
+              value={countedCash === null ? "" : formatMoneyInput(countedCash)}
+            />
             {stock.map((s) => (
               <input key={s.product_id} type="hidden" name="product_id" value={s.product_id} />
             ))}
