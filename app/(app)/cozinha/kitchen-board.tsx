@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { updateStatusAction } from "@/lib/auth/kitchen";
-import BackButton from "@/components/back-button";
+import {
+  kitchenItemsForDisplay,
+  isComplementReopen,
+  type KitchenComplementRow,
+  type KitchenItemRow,
+} from "@/lib/kitchen-display";
 
 interface KitchenItem {
   name: string;
@@ -17,6 +22,7 @@ interface KitchenOrder {
   customer_name: string | null;
   status: string;
   created_at: string;
+  complement_reopen: boolean;
   items: KitchenItem[];
 }
 
@@ -45,6 +51,11 @@ export default function KitchenBoard({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const ordersRef = useRef(orders);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
 
   const ordersByStatus = useMemo(() => {
     const map: Record<string, KitchenOrder[]> = {};
@@ -76,22 +87,85 @@ export default function KitchenBoard({
     }
   };
 
-  // Realtime: ao receber novo pedido (INSERT), destaca e toca beep
+  const highlightNewOrder = (orderId: string) => {
+    playBeep();
+    setNewIds((prev) => [orderId, ...prev.filter((id) => id !== orderId)]);
+    window.setTimeout(() => {
+      setNewIds((prev) => prev.filter((id) => id !== orderId));
+    }, 10000);
+  };
+
+  // Realtime: novo pedido ou complemento reaberto
   useEffect(() => {
-    const fetchItems = async (orderIds: string[]) => {
-      const { data } = await supabase
-        .from("order_items")
-        .select("order_id, product_name, quantity, complement_id")
-        .in("order_id", orderIds);
-      const map: Record<string, KitchenItem[]> = {};
-      for (const it of data ?? []) {
-        (map[it.order_id] ??= []).push({
-          name: it.product_name,
-          qty: it.quantity,
-          complement: it.complement_id !== null,
+    const fetchKitchenData = async (orderIds: string[]) => {
+      if (orderIds.length === 0) {
+        return {
+          itemsMap: {} as Record<string, KitchenItem[]>,
+          complementsMap: {} as Record<string, KitchenComplementRow[]>,
+        };
+      }
+
+      const [{ data: itemsData }, { data: complementsData }] = await Promise.all([
+        supabase
+          .from("order_items")
+          .select("order_id, product_name, quantity, complement_id")
+          .in("order_id", orderIds),
+        supabase
+          .from("order_complements")
+          .select("id, order_id, kitchen_status")
+          .in("order_id", orderIds),
+      ]);
+
+      const complementsMap: Record<string, KitchenComplementRow[]> = {};
+      for (const c of complementsData ?? []) {
+        (complementsMap[c.order_id] ??= []).push({
+          id: c.id,
+          kitchen_status: c.kitchen_status,
         });
       }
-      return map;
+
+      const rawByOrder: Record<string, KitchenItemRow[]> = {};
+      for (const it of itemsData ?? []) {
+        (rawByOrder[it.order_id] ??= []).push({
+          product_name: it.product_name,
+          quantity: it.quantity,
+          complement_id: it.complement_id,
+        });
+      }
+
+      const itemsMap: Record<string, KitchenItem[]> = {};
+      for (const orderId of orderIds) {
+        const order = ordersRef.current.find((o) => o.id === orderId);
+        const status = order?.status ?? "novo";
+        itemsMap[orderId] = kitchenItemsForDisplay(
+          status,
+          rawByOrder[orderId] ?? [],
+          complementsMap[orderId] ?? []
+        );
+      }
+
+      return { itemsMap, complementsMap };
+    };
+
+    const applyKitchenData = (
+      orderId: string,
+      status: string,
+      itemsMap: Record<string, KitchenItem[]>,
+      complementsMap: Record<string, KitchenComplementRow[]>
+    ) => {
+      const complements = complementsMap[orderId] ?? [];
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status,
+                complement_reopen: isComplementReopen(status, complements),
+                items: itemsMap[orderId] ?? o.items,
+              }
+            : o
+        )
+      );
     };
 
     const channel = supabase
@@ -109,6 +183,7 @@ export default function KitchenBoard({
           }
 
           const updated = row as Partial<KitchenOrder>;
+          const oldStatus = (payload.old as { status?: string } | null)?.status;
 
           if (["cancelado", "entregue"].includes(String(updated.status))) {
             setOrders((prev) => prev.filter((o) => o.id !== orderId));
@@ -116,6 +191,9 @@ export default function KitchenBoard({
           }
 
           if (payload.eventType === "UPDATE") {
+            const nextStatus =
+              updated.status ?? ordersRef.current.find((o) => o.id === orderId)?.status ?? "novo";
+
             setOrders((prev) => {
               const exists = prev.some((o) => o.id === orderId);
               const patched: KitchenOrder = {
@@ -125,11 +203,13 @@ export default function KitchenBoard({
                   updated.customer_name ??
                   prev.find((o) => o.id === orderId)?.customer_name ??
                   null,
-                status: updated.status ?? prev.find((o) => o.id === orderId)?.status ?? "novo",
+                status: nextStatus,
                 created_at:
                   updated.created_at ??
                   prev.find((o) => o.id === orderId)?.created_at ??
                   new Date().toISOString(),
+                complement_reopen:
+                  prev.find((o) => o.id === orderId)?.complement_reopen ?? false,
                 items: prev.find((o) => o.id === orderId)?.items ?? [],
               };
               const list = exists
@@ -138,12 +218,12 @@ export default function KitchenBoard({
               return list.sort((a, b) => a.number - b.number);
             });
 
-            const itemsMap = await fetchItems([orderId]);
-            setOrders((prev) =>
-              prev.map((o) =>
-                o.id === orderId ? { ...o, items: itemsMap[orderId] ?? o.items } : o
-              )
-            );
+            const { itemsMap, complementsMap } = await fetchKitchenData([orderId]);
+            applyKitchenData(orderId, nextStatus, itemsMap, complementsMap);
+
+            if (oldStatus === "pronto" && nextStatus === "novo") {
+              highlightNewOrder(orderId);
+            }
             return;
           }
 
@@ -154,16 +234,19 @@ export default function KitchenBoard({
             .eq("id", orderId)
             .single();
           if (!fresh) return;
-          const itemsMap = await fetchItems([orderId]);
+
+          const { itemsMap, complementsMap } = await fetchKitchenData([orderId]);
 
           setOrders((prev) => {
             const exists = prev.some((o) => o.id === orderId);
+            const complements = complementsMap[orderId] ?? [];
             const next: KitchenOrder = {
               id: fresh.id,
               number: fresh.number,
               customer_name: fresh.customer_name,
               status: fresh.status,
               created_at: fresh.created_at,
+              complement_reopen: isComplementReopen(fresh.status, complements),
               items: itemsMap[orderId] ?? [],
             };
             const list = exists
@@ -172,14 +255,7 @@ export default function KitchenBoard({
             return list.sort((a, b) => a.number - b.number);
           });
 
-          // Novo pedido: destaque visual + beep
-          if (payload.eventType === "INSERT") {
-            playBeep();
-            setNewIds((prev) => [orderId, ...prev.filter((id) => id !== orderId)]);
-            window.setTimeout(() => {
-              setNewIds((prev) => prev.filter((id) => id !== orderId));
-            }, 10000);
-          }
+          highlightNewOrder(orderId);
         }
       )
       .subscribe();
@@ -211,12 +287,9 @@ export default function KitchenBoard({
       {/* Header enxuto */}
       <header className="sticky top-0 z-10 border-b border-neutral-200/80 bg-white/85 backdrop-blur-md">
         <div className="flex w-full items-center justify-between gap-3 py-3">
-          <div className="flex items-center gap-2">
-            <BackButton />
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-neutral-800">Cozinha</p>
-              <p className="text-xs font-medium text-neutral-500">{dayLabel}</p>
-            </div>
+          <div>
+            <p className="text-sm font-bold uppercase tracking-wider text-neutral-800">Cozinha</p>
+            <p className="text-xs font-medium text-neutral-500">{dayLabel}</p>
           </div>
           <span className="sk-badge sk-badge--info">
             {orders.filter((o) => o.status !== "pronto").length} a fazer
@@ -269,6 +342,11 @@ export default function KitchenBoard({
                           <p className="text-sm font-bold uppercase text-neutral-700">
                             {o.customer_name ?? "Cliente"}
                           </p>
+                          {o.complement_reopen && (
+                            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-primary-700">
+                              🔔 Complemento
+                            </p>
+                          )}
                         </div>
                         <span className="text-xs sk-text-muted">{time(o.created_at)}</span>
                       </div>

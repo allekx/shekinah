@@ -46,7 +46,7 @@ export default function AddItemsModal({
   };
   products: CatalogProduct[];
   onClose: () => void;
-  onAdded: (updated: { id: string; total: number }) => void;
+  onAdded: (updated: { id: string; total: number; status?: string }) => void;
 }) {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [pending, setPending] = useState(false);
@@ -111,7 +111,11 @@ export default function AddItemsModal({
       return;
     }
 
-    onAdded({ id: order.id, total: res.total ?? order.total });
+    onAdded({
+      id: order.id,
+      total: res.total ?? order.total,
+      status: res.status,
+    });
     onClose();
 
     void (async () => {

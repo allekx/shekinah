@@ -222,9 +222,12 @@ export default function OrdersBoard({
           order={addFor}
           products={products}
           onClose={() => setAddFor(null)}
-          onAdded={({ id, total }) => {
-            // atualiza o total local (o Realtime também vai refetchar itens)
-            setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, total } : o)));
+          onAdded={({ id, total, status }) => {
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.id === id ? { ...o, total, ...(status ? { status } : {}) } : o
+              )
+            );
           }}
         />
       )}

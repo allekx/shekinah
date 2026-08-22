@@ -33,6 +33,7 @@ export interface AddItemsResult {
   orderId?: string;
   orderNumber?: number;
   total?: number;
+  status?: string;
   /** Itens adicionados (snapshot, para a comanda complementar). */
   complementItems?: { product_name: string; quantity: number; unit_price: number }[];
 }
@@ -74,11 +75,14 @@ export async function addItemsAction(
 
   revalidatePath("/caixa");
   revalidatePath("/estoque");
+  revalidatePath("/pedidos");
+  revalidatePath("/cozinha");
 
   return {
     orderId: data?.id as string | undefined,
     orderNumber: data?.number as number | undefined,
     total: data?.total != null ? Number(data.total) : undefined,
+    status: data?.status as string | undefined,
     complementItems: items.map((it) => ({
       product_name: namesById[it.product_id] ?? "?",
       quantity: it.quantity,
