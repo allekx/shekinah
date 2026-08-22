@@ -38,6 +38,7 @@ O objetivo principal do sistema é permitir que o estabelecimento controle todo 
 - **Segurança no banco**: RLS em todas as tabelas + validação explícita de papel dentro de cada RPC.
 - **Preço é snapshot no item do pedido**: mudança futura de preço/catálogo não altera histórico.
 - **Pedido NÃO fica bloqueado após envio à cozinha (COMPLEMENTOS)**: John pode adicionar itens a um pedido existente (`add_items_to_order`) enquanto o dia estiver aberto e o pedido não estiver pago/cancelado/entregue. Modelo: tabela `order_complements` + `order_items.complement_id`. O pedido não é imutável após ir à cozinha.
+- **Complemento em pedido PRONTO reabre a cozinha**: ao adicionar itens com status `pronto`, o pedido volta para `novo` (histórico `pronto→novo`). A cozinha vê **somente os itens do complemento pendente** — itens originais já preparados **não** reaparecem na fila (evita refazer pratos). Controle por `order_complements.kitchen_status` (`pendente` / `em_preparo` / `pronto`).
 
 ## 5. Estrutura do projeto
 
@@ -45,11 +46,11 @@ O objetivo principal do sistema é permitir que o estabelecimento controle todo 
 SHEKINAH/
 ├─ cloud.md                    # Documento Central de Memória e Continuidade
 ├─ app/                        # Frontend Next.js (App Router)
-│  ├─ (auth)/login/page.tsx    # Login mobile-first — hero laranja + card; lg+ layout duas colunas (notebook)
+│  ├─ (auth)/login/page.tsx    # Login — lg+: imagem full-bleed à esquerda + card estreito à direita; mobile: card sobre fundo
 │  ├─ (app)/layout.tsx         # Shell autenticado (header + sessão + logout)
 │  ├─ (app)/session-header.tsx # Cabeçalho de sessão (marca + perfil + botão sair)
 │  ├─ (app)/page.tsx           # Home: dashboard do dia (john) / INICIAR DIA (sem dia: hero com foto home-hero.png)
-│  ├─ (app)/home-dashboard.tsx # Client: métricas ao vivo (Realtime orders) + grid Ações
+│  ├─ (app)/home-dashboard.tsx # Client: métricas ao vivo (Realtime orders) + grid Ações (SkNavLink + skeleton)
 │  ├─ (app)/usuarios/          # Gestão de usuários (john) — criar, e-mail, papel, senha
 │  │  ├─ page.tsx              #   server: lista profiles
 │  │  ├─ user-form.tsx         #   client: criar usuário (cozinha/atendimento)
@@ -58,10 +59,10 @@ SHEKINAH/
 │  │  ├─ page.tsx              #   server: carrega produtos, redireciona se dia aberto
 │  │  ├─ open-day-form.tsx     #   client: estoque [-] qty [+] + caixa + confirmar (input qty: texto, vazio=0)
 │  │  └─ open-day-add-product.tsx  # client: cadastrar produto antes de abrir o dia
-│  ├─ (app)/cozinha/           # Interface exclusiva da cozinha
-│  │  ├─ page.tsx              #   server: pedidos + itens do dia (join aninhado)
+│  ├─ (app)/cozinha/           # Interface exclusiva da cozinha (home do perfil cozinha — sem botão voltar)
+│  │  ├─ page.tsx              #   server: pedidos + itens + order_complements (filtro kitchen-display)
 │  │  ├─ loading.tsx           #   skeleton kanban
-│  │  └─ kitchen-board.tsx     #   client: 3 colunas + Realtime + update otimista
+│  │  └─ kitchen-board.tsx     #   client: 3 colunas + Realtime + beep em complemento + 🔔 COMPLEMENTO
 │  ├─ (app)/produtos/          # Gerenciamento de produtos (CRUD, john)
 │  │  ├─ page.tsx              #   server: lista produtos + formulário
 │  │  ├─ product-form.tsx      #   client: criar produto
@@ -91,7 +92,8 @@ SHEKINAH/
 │  ├─ (app)/pedidos/           # Acompanhamento de pedidos (john, Realtime)
 │  │  ├─ page.tsx              #   server: pedidos + itens do dia (join aninhado)
 │  │  ├─ loading.tsx           #   skeleton kanban
-│  │  └─ orders-board.tsx      #   client: grid status + Realtime otimizado
+│  │  ├─ orders-board.tsx      #   client: grid status + Realtime + modal adicionar itens
+│  │  └─ add-items-modal.tsx   #   client: abas de categoria + addItemsAction + comanda complementar
 │  ├─ (app)/loading.tsx        # Skeleton padrão da área autenticada
 │  ├─ layout.tsx               # Layout raiz (metadata, ícones favicon/PWA, pt-BR)
 │  ├─ manifest.ts              # Manifest PWA (standalone, Next.js)
@@ -102,16 +104,19 @@ SHEKINAH/
 │  ├─ auth/open-day.ts         # Server action: openDay (abertura do dia)
 │  ├─ auth/products.ts         # Server actions: produtos (CRUD)
 │  ├─ auth/stock.ts            # Server action: ajuste de estoque
-│  ├─ auth/orders.ts           # Server action: createOrderAction (novo pedido)
+│  ├─ auth/orders.ts           # Server actions: createOrderAction, addItemsAction, cancelOrderAction
 │  ├─ auth/kitchen.ts          # Server action: updateStatusAction (cozinha)
 │  ├─ auth/cashier.ts          # Server action: addPaymentAction (caixa)
 │  ├─ auth/close-day.ts        # Server action: closeDay (fechamento)
 │  ├─ auth/users.ts            # Server actions: gestão de usuários (Admin API server-side)
+│  ├─ kitchen-display.ts       # Filtro de itens visíveis na cozinha (complemento vs original)
+│  ├─ money.ts                 # Entrada monetária estilo banco (dígitos da direita → centavos)
 │  ├─ supabase/admin.ts        # Cliente service_role — SOMENTE servidor (criar/redefinir senha/e-mail)
 │  ├─ supabase/queries.ts      # Helpers memoizados: getOpenBusinessDay, getCatalogWithStock
 │  ├─ catalog.ts               # groupProductsByCategory, parseQtyInput, tipos de catálogo
 │  ├─ greeting.ts              # Saudação dinâmica (Bom dia/tarde/noite, fuso America/Sao_Paulo)
 │  └─ printing/                # Camada modular de impressão
+│     ├─ print.ts              #   printOrderReceipt, printComplementReceipt (desacoplado)
 │     ├─ types.ts              #   interfaces ReceiptBuilder/PrinterTransport
 │     ├─ text-builder.ts       #   formatador de texto (largura em colunas)
 │     ├─ escpos.ts             #   bytes ESC/POS (INIT, alinhamento, negrito)
@@ -119,16 +124,22 @@ SHEKINAH/
 │     └─ transports.ts         #   transportes plugáveis (preview default + stubs)
 ├─ components/
 │  ├─ page-shell.tsx              # Cabeçalho padrão das páginas internas (BackButton + título)
+│  ├─ back-button.tsx             # Voltar (router.back) — NÃO usado na cozinha
+│  ├─ navigation-pending.tsx      # NavigationPendingProvider, SkNavLink, useSkNavigate (skeleton instantâneo)
+│  ├─ category-tabs.tsx           # Abas de categoria reutilizáveis (scroll horizontal mobile)
+│  ├─ money-input.tsx             # Campo monetário estilo banco (MoneyInput)
 │  ├─ skeletons/page-skeletons.tsx # Skeletons (produtos, kanban, caixa, home)
 │  ├─ brand-mark-icon.tsx         # Ícone da marca (sítio + cozinha + pedido)
 │  ├─ brand-wordmark.tsx          # Marca Shekinah (ícone + logotipo tipográfico)
 │  ├─ print/
-│  │  └─ print-preview-modal.tsx  # Pré-visualização (modal monoespaçado)
+│  │  ├─ print-preview-modal.tsx  # Modal limpo: título do documento + conteúdo + Fechar
+│  │  └─ print-receipt-button.tsx # Botão imprimir → modal (sem mensagens técnicas no preview)
 │  ├─ sw-register.tsx             # Registro do service worker (PWA)
 │  └─ connection-banner.tsx       # Banner de sem-conexão (aviso online/offline)
 ├─ public/                        # Assets PWA
 │  ├─ sw.js                       #   service worker (network-first, standalone)
 │  ├─ home-hero.png               #   foto hero da home sem dia aberto
+│  ├─ img/sistema-shekinah-tela-de-login.png  # imagem full-bleed do login (notebook)
 │  ├─ brand-mark.svg              #   símbolo da marca (transparente, para maskable)
 │  ├─ icon.svg                    #   ícone principal (gradiente primary + BrandMarkIcon)
 │  ├─ icon-192/512/maskable.png + apple-touch-icon.png + favicon-16/32.png
@@ -140,23 +151,16 @@ SHEKINAH/
 └─ supabase/
 │  ├─ config.toml              # Configuração do Supabase CLI (sem credenciais)
 │  ├─ README.md                # Instruções de uso das migrations
-│  ├─ migrations/              # SQL versionado do banco (0001..0010)
-│  │  ├─ 0001_enums_and_base.sql              # Enums (app_role, order_status, payment_method, business_day_status)
-│  │  ├─ 0002_profiles_trigger_rls.sql        # profiles + trigger handle_new_user + RLS
-│  │  ├─ 0003_products_daily_stock.sql        # products + daily_stock + RLS
-│  │  ├─ 0004_orders_items_payments_history.sql # business_days + orders + order_items + payments + order_status_history
-│  │  ├─ 0005_settings_helpers.sql            # settings + helpers is_john/is_cozinha
-│  │  ├─ 0006_rpc_open_close_day.sql          # RPCs: open/close_business_day, get_closeout, apply_payment_internal
-│  │  ├─ 0007_rpc_create_order.sql            # RPC create_order (anti-corrida)
-│  │  ├─ 0008_rpc_status_payment_cancel.sql   # RPCs: update_order_status, add_payment, cancel_order
-│  │  ├─ 0010_realtime.sql                    # publicação Realtime (orders)
-│  │  ├─ 0011_order_complements.sql           # COMPLEMENTOS: order_complements + complement_id + RPCs add_items_to_order/get_complement_details
-│  │  ├─ 0012_stock_movements.sql             # MOVIMENTAÇÕES: stock_movements + trigger + RPC adjust_stock
-│  │  ├─ 0013_rpc_role_checks.sql             # SEGURANÇA: validação de john em get_closeout/apply_payment_internal
-│  │  ├─ 0014_security_hardening.sql          # AUDITORIA: RLS business_days/orders, troco só dinheiro, revoke helpers
-│  │  ├─ 0015_security_integrity.sql          # AUDITORIA: create_order refeito (TOCTOU) + order_id real do trigger
-│  │  ├─ 0016_revoke_helpers.sql              # AUDITORIA: revoke is_john/cozinha de anon/public
-│  │  └─ 0017_fix_helper_grants.sql           # AUDITORIA: fix — restore EXECUTE authenticated (RLS)
+│  ├─ migrations/              # SQL versionado do banco (0001..0027)
+│  │  ├─ 0001_enums_and_base.sql … 0017_fix_helper_grants.sql  # (base, RLS, RPCs, segurança)
+│  │  ├─ 0018_review_fixes.sql              # pronto+pago→entregue; john vê produtos inativos
+│  │  ├─ 0019_review_troco.sql              # troco só dinheiro (líquido amount - change_given)
+│  │  ├─ 0020_allow_reopen_same_day.sql     # remove UNIQUE(day); permite reabrir mesma data
+│  │  ├─ 0021_order_print_log.sql           # printed_at + print_attempts em orders
+│  │  ├─ 0022–0024_official_*_catalog.sql   # catálogo oficial (pratos, bebidas, porções/sobremesas)
+│  │  ├─ 0025_fix_adjust_stock.sql
+│  │  ├─ 0026_complement_kitchen_flow.sql   # kitchen_status em complementos; pronto+complemento→novo
+│  │  └─ 0027_fix_stuck_complement_orders.sql  # corrige pedidos presos em pronto (pré-0026)
 │  ├─ seed.sql                 # settings padrão + produtos de exemplo
 │  └─ tests.sql                # Roteiro de testes (integridade/RLS/RPC)
 ```
@@ -178,7 +182,7 @@ SHEKINAH/
 - **`daily_stock`** — estoque diário por produto (business_day_id, product_id, initial_qty, sold_qty, final_counted_qty). Saldo = `initial_qty - sold_qty` (não armazenado).
 - **`orders`** — pedidos (id, business_day_id, number, customer_name, status, total, paid, paid_at, timestamps). `unique(business_day_id, number)`. `total` é recalculado pela soma de TODOS os itens (originais + complementos).
 - **`order_items`** — itens com snapshot de produto/nome/preço/subtotal (order_id, product_id, product_name, quantity, unit_price, subtotal, complement_id nullable, created_at). `complement_id = NULL` = item original; preenchido = item de complemento (FK composta `(order_id, complement_id) → order_complements(order_id, id)`).
-- **`order_complements`** — agrupador de itens adicionados depois (id, order_id, created_by, created_at). Auditoria de complementos: quem/quando/itens.
+- **`order_complements`** — agrupador de itens adicionados depois (id, order_id, created_by, created_at, **kitchen_status**). `kitchen_status`: `pendente` | `em_preparo` | `pronto` — preparo na cozinha **só dos itens deste complemento** (itens originais têm `complement_id = NULL`).
 - **`payments`** — pagamentos divididos (order_id, method, amount, change_given, created_by).
 - **`order_status_history`** — auditoria de transições de status (order_id, from_status, to_status, changed_by, created_at).
 - **`settings`** — configuração chave/valor JSON (tz, establishment, printer).
@@ -203,9 +207,10 @@ SHEKINAH/
 - **Anti-corrida**: `SELECT ... FOR UPDATE` na linha do dia e de `daily_stock` por produto.
 - Dados de dias encerrados são **preservados** (histórico, sem delete).
 - **Complementos**: pedido pode receber novos itens (`add_items_to_order`) enquanto dia aberto e pedido não pago/cancelado/entregue. Revalida estoque, baixa novamente, recalcula total, registra auditoria (order_complements) e envia Realtime UPDATE em `orders`. Itens originais nunca são editados/apagados (sem edição destrutiva).
+- **Complemento em pedido PRONTO**: RPC `add_items_to_order` muda status `pronto → novo` + histórico; novo complemento com `kitchen_status = pendente`. Cozinha filtra itens via `lib/kitchen-display.ts`: em `novo` com complemento pendente, mostra **apenas** itens do complemento (não repete pratos já prontos). `update_order_status` sincroniza `kitchen_status` dos complementos (`novo→em_preparo`: pendente→em_preparo; `em_preparo→pronto`: em_preparo→pronto).
 
 ### Migrations
-- 10 arquivos em `supabase/migrations/` (0001 a 0011), seed e tests.
+- 27 arquivos em `supabase/migrations/` (0001 a 0027), seed e tests. Últimas: **0026** (fluxo cozinha/complemento), **0027** (backfill pedidos presos em pronto).
 
 ### RPCs
 | RPC | Função | Papel |
@@ -215,19 +220,18 @@ SHEKINAH/
 | `get_closeout` | Relatório de conferência/fechamento | john |
 | `create_order` | Cria pedido, baixa estoque atômico, numeração sequencial, pagamento opcional | john |
 | `add_payment` | Pagamento adicional (dividido) | john |
-| `update_order_status` | Transições de status com regras por papel | cozinha/john |
+| `update_order_status` | Transições de status com regras por papel; sincroniza `order_complements.kitchen_status` | cozinha/john |
 | `cancel_order` | Cancela pedido não pago e restaura estoque (inclui itens de complemento) | john |
-| `add_items_to_order` | Adiciona COMPLEMENTO a pedido existente (valida/baixa estoque, recalcula total, auditoria) | john |
+| `add_items_to_order` | Adiciona COMPLEMENTO; se pedido estava `pronto`, reabre cozinha (`status→novo`); valida/baixa estoque, recalcula total | john |
 | `get_complement_details` | Detalhes da comanda complementar (para impressão/exibição na cozinha) | autenticado |
 | `apply_payment_internal` | Helper de aplicação de pagamento (troco, excedente) | interno |
 
 ## 7. Usuários e permissões
 
 - **John** (papel `john`) — atendimento, caixa, abertura/fechamento do dia, relatórios, configurações, gestão de produtos/usuários/impressora.
-- **Cozinha** (papel `cozinha`) — somente cozinha: ver pedidos e mudar status (`novo → em_preparo → pronto`). Sem acesso a caixa, pagamentos, estoque, relatórios ou configurações.
+- **Cozinha** (papel `cozinha`) — somente cozinha: ver pedidos filtrados (`kitchen-display`), mudar status (`novo → em_preparo → pronto`), receber complementos (🔔, beep). Sem caixa, pagamentos, estoque, relatórios ou botão voltar em `/cozinha`. Redirect automático de `/` → `/cozinha`.
 
-- **Atendimento** (papel `john`) — o papel `john` representa o atendimento/gerência: iniciar/fechar dia, caixa, pedidos, relatórios, configurações. Usuário real: `atendimento@shekinah.com`.
-- **Cozinha** (papel `cozinha`) — somente cozinha. Usuário real: `cozinha@shekinah.com`.
+Usuários reais: `atendimento@shekinah.com` (john), `cozinha@shekinah.com` (cozinha).
 
 Criação de usuários:
 
@@ -251,10 +255,16 @@ Criação de usuários:
 - [x] Estoque operacional (saldo do dia, ajuste +/-, ESGOTADO, histórico de movimentações) — testado
 - [x] Pedidos (tela de atendimento /pedidos/novo + server action + RPC create_order) — código pronto, fluxo TESTADO ponta a ponta (15 cenários OK)
 - [x] Acompanhamento de pedidos (tela /pedidos + Realtime) — grid NOVOS/PREPARO/PRONTOS/FINALIZADOS, atualização automática
-- [x] Cozinha (interface exclusiva /cozinha + Realtime) — 3 colunas, transições de status, destaque + som; permissões protegidas
+- [x] Cozinha (interface exclusiva /cozinha + Realtime) — 3 colunas, transições de status, destaque + som; complemento reabre fila (🔔, só itens novos); **sem botão voltar** (cozinha é home do perfil)
+- [x] Complementos na cozinha (migrations 0026/0027) — pedido pronto + itens → NOVOS; filtro `kitchen-display`; beep ao reabrir; backfill pedidos presos
+- [x] Adicionar itens a pedido existente (UI + RPC + comanda complementar) — modal em `/pedidos`, `addItemsAction` retorna status/total
+- [x] Entrada monetária estilo banco (`lib/money.ts` + `MoneyInput`) — caixa (receber/conferência), fechamento; dígitos da direita (centavos)
+- [x] Abas de categoria reutilizáveis (`CategoryTabs`) — novo pedido + modal complemento; scroll horizontal no mobile
+- [x] Navegação com skeleton instantâneo (`SkNavLink`, `NavigationPendingProvider`) — home, histórico, links principais
+- [x] Login notebook — layout lg+ duas colunas com imagem `/img/sistema-shekinah-tela-de-login.png`; card refinado; "Acesso interno" mantido
 - [x] Caixa (módulo /caixa) — resumo (inicial/vendas por forma/esperado), receber pedidos (pagamento dividido/troco), conferência (contado vs esperado, diferença)
 - [x] Fechamento do dia (tela /fechamento) — conferência (vendas/caixa/estoque), confirmar, bloqueia dia, DIA ENCERRADO + IMPRIMIR RELATÓRIO
-- [x] Impressão (arquitetura modular) — camada lib/printing + preview; formatos comanda/complemento/relatório prontos; transportes plugáveis (método a definir)
+- [x] Impressão (arquitetura modular) — camada lib/printing + preview; formatos comanda/complemento/relatório; modal limpo (sem textos técnicos no topo/rodapé)
 - [x] Histórico e Relatórios — /historico (dias encerrados) e /relatorio/[dayId] (detalhes + imprimir relatório)
 - [x] Dashboard principal do John (home /) — sem dia → INICIAR DIA; com dia → métricas ao vivo (Realtime) + saudação dinâmica + grid Ações (Pedidos, Caixa, Estoque, **Usuários**)
 - [x] Gestão de usuários (/usuarios) — criar cozinha/atendimento, alterar e-mail, trocar papel, redefinir senha (john + Admin API server-side)
@@ -282,10 +292,10 @@ ESTOQUE
 COZINHA
 ↓
 PEDIDO PRONTO
-↓
-PAGAMENTO
-↓
-CAIXA
+↓                    ↓ (John adiciona complemento — pedido não pago)
+PAGAMENTO              COZINHA (reabre NOVOS — só itens 🔔 do complemento)
+↓                    ↓
+CAIXA                  PEDIDO PRONTO (novamente)
 ↓
 CONFERÊNCIA
 ↓
@@ -317,6 +327,10 @@ DIA ENCERRADO
 - Foi decidido que **complemento é permitido com pagamento parcial** (bloqueado apenas após `paid=true`).
 - Foi decidido que **não há edição destrutiva de itens já enviados**; remoção é operação separada com auditoria (fora do escopo atual).
 - Foi decidido que **a cozinha identifica complemento** (🔔 COMPLEMENTO — PEDIDO #X) e que a **impressão do complemento é uma comanda complementar separada** (não reimprime o pedido inteiro).
+- Foi decidido que **complemento em pedido PRONTO reabre a cozinha** (`pronto→novo`) mas **não repete itens originais** na fila — só itens do complemento com `kitchen_status` pendente/em_preparo (`lib/kitchen-display.ts` + `order_complements.kitchen_status`).
+- Foi decidido que **complemento em pedido EM PREPARO** mantém o status; cozinha vê itens originais **e** itens do complemento pendente (ambos na fila).
+- Foi decidido que **perfil cozinha não tem botão voltar** em `/cozinha` — é a tela principal desse usuário (redirect automático de `/`).
+- Foi decidido que **valores monetários em caixa/fechamento** usam entrada estilo banco (`MoneyInput`: dígitos da direita, campo inicia vazio, focus seleciona tudo).
 - Foi decidido que **novos produtos podem ser cadastrados na tela /abrir-dia** antes de iniciar o dia (reutiliza `createProduct`; ordem da grade: Pratos → Bebidas → cadastrar produto → caixa).
 - Foi decidida a **identidade visual da marca**: ícone customizado (casa rústica + fumaça de cozinha + prato) substituindo a letra "S"; logotipo **SHEKINAH** em uppercase com `tracking-[0.18em]` (componentes `brand-mark-icon` + `brand-wordmark`).
 - Foi decidida a **paleta laranja da identidade visual** (restaurante no sítio): laranja forte `#FF8A4F` (`primary-500`) e pêssego `#FFC176` (`primary-300`). Escala completa em `app/globals.css` (`primary-50`…`primary-900`); substitui o azul anterior em todo o app (botões, gradientes, focus, PWA `theme_color`).
@@ -324,6 +338,7 @@ DIA ENCERRADO
 - Foi decidido que **cache de dados no frontend** usa `React.cache()` no servidor (por request) para dia aberto e catálogo — **sem** cache client de estoque/preço (evita pedidos com disponibilidade incorreta).
 - Foi decidido que **novo pedido e complementos** usam **abas de categoria** (troca instantânea no client; dados vêm do SSR) em vez de renderizar todas as categorias de uma vez.
 - Foi decidido que telas com Realtime **não** disparam `revalidatePath(..., "layout")` a cada ação — Realtime + update otimista cobrem pedidos/cozinha/home; revalidação limitada a `/caixa` e `/estoque` (sem Realtime).
+- Foi decidido que o **modal de impressão** (`print-preview-modal`) mostra só o título do documento (ex.: "Relatório de fechamento", "Comanda") — sem sufixo "pré-visualização", sem rodapé com textos técnicos ("modo teste", "formato de impressão"); rodapé só em erro ou confirmação de envio à impressora física.
 
 ## 11. Impressão
 
@@ -379,7 +394,10 @@ DIA ENCERRADO
 - **Complemento**: SHEKINAH / **COMPLEMENTO** / PEDIDO #XXX / CLIENTE / itens / VALOR DO COMPLEMENTO / DATA-HORA.
 - **Relatório de fechamento**: SHEKINAH / FECHAMENTO DO DIA / Data-Horário / Pedidos / Total vendido / Dinheiro / Pix / Cartão / Caixa inicial / Esperado / Contado / Diferença / Resumo de estoque / Status.
 
-**Componente de pré-visualização**: `components/print/print-preview-modal.tsx` (modal monoespaçado — "como seria impresso"), com botão `PrintPreviewButton`.
+**Componentes de impressão na UI:**
+- **`print-preview-modal.tsx`**: modal monoespaçado com título conforme o tipo (`Comanda` / `Comanda complementar` / `Relatório de fechamento`), conteúdo térmico e botão **Fechar**. Sem textos técnicos no topo ou rodapé no modo preview.
+- **`print-receipt-button.tsx`**: botão que chama `printOrderReceipt` / `printComplementReceipt` / `printCloseoutReceipt` e abre o modal; mensagem de status só se enviou à impressora ou houve erro.
+- **`PrintPreviewButton`**: abre o modal diretamente (sem transporte).
 
 **Decisões e limitações (documentadas):**
 - **Método de conexão NÃO definido** (pode ser Bluetooth, USB-C/OTG, Wi-Fi/rede). Não assumir modelo.
@@ -394,11 +412,12 @@ DIA ENCERRADO
    - Causa: helpers eram `SECURITY INVOKER` → recursão com a política de `profiles`.
    - Solução: tornar os helpers `SECURITY DEFINER` com `set search_path=''` e referências qualificadas (quebra a recursão, sem escalar privilégio — consultam apenas o próprio papel).
    - Status: **resolvido** — correção aplicada no banco e nas migrations 0002/0005; RLS revalidado.
-2. **`business_days.day` é UNIQUE (RESOLVIDO)**: não era possível abrir um segundo dia na mesma data. Tornou-se o **problema de produção de 12/08/2026** (não se conseguia iniciar novo dia após o fechamento). **Correção aplicada (migration `0020`, 12/08/2026)**: removido `UNIQUE(day)`; `business_days_one_open_idx` garante no máximo 1 dia aberto. Verificado no banco real (índice removido, dados intactos).**
+2. **`business_days.day` é UNIQUE (RESOLVIDO)**: não era possível abrir um segundo dia na mesma data. **Correção aplicada (migration `0020`)**: removido `UNIQUE(day)`; `business_days_one_open_idx` garante no máximo 1 dia aberto. Aplicada e validada no banco real.
 3. **Papel por prefixo de e-mail**: acoplamento simples; se John quiser papel manual, criar RPC de gestão de usuário.
 4. **Teste de anti-corrida concorrente não executado**: o teste real de duas conexões simultâneas da última unidade não pôde ser rodado. A mecânica (locks `FOR UPDATE`) está implementada e o bloqueio de estoque insuficiente foi validado; o teste concorrente fica como pendência.
 5. **Login falha para usuários criados via SQL direto**: usuários inseridos fora do painel (INSERT em `auth.users`) geram "Database error querying schema" no GoTrue. Causa: faltam identity/metadados no formato exato do GoTrue. Solução: criar usuários **sempre pelo painel/Admin API**. Os usuários de teste criados via SQL foram removidos.
-6. **Origem dos usuários**: usuários reais `atendimento@shekinah.com` (papel `john`) e `cozinha@shekinah.com` (papel `cozinha`). Papel ajustado via SQL para o atendimento.
+6. **Origem dos usuários**: usuários reais `atendimento@shekinah.com` (papel `john`) e `cozinha@shekinah.com` (papel `cozinha`).
+7. **Complemento em pedido pronto não reabria cozinha (RESOLVIDO 21/08/2026)**: antes da migration `0026`, `add_items_to_order` não mudava status; pedido ficava em PRONTOS. Correção: `0026` + `0027` (backfill) + `lib/kitchen-display.ts` + UI cozinha.
 
 ## 13. Testes
 
@@ -448,7 +467,17 @@ Schema validado: 9 tabelas, 4 enums, 13 check constraints, 13 FKs, RLS em todas 
 | 7 | Atomicidade: complemento com estoque insuficiente (999 tambaquis) | ✅ Bloqueado (`ESTOQUE_INSUFICIENTE`), nada gravado (sem complemento órfão, sem baixa parcial) |
 | 8 | RLS: cozinha vê `order_complements` (🔔) | ✅ OK (SELECT authenticated) |
 
-O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corrida concorrente (ver Problemas).
+O roteiro completo está em `supabase/tests.sql`. Pendências: teste de anti-corrida concorrente; bateria formal do fluxo complemento→cozinha (0026).
+
+**Testes de COMPLEMENTO → COZINHA (21/08/2026 — validação manual):**
+
+| # | Cenário | Resultado |
+|---|---|---|
+| 1 | Pedido PRONTO + adicionar picanha → status `novo` no John | ✅ após 0026 |
+| 2 | Cozinha vê pedido em NOVOS com 🔔; **não** lista itens originais (ex.: arroz) | ✅ `kitchen-display` |
+| 3 | Cozinha prepara complemento → pronto; pedido volta a PRONTOS | ✅ |
+| 4 | Backfill 0027 corrige pedidos presos em pronto (pré-migration) | ✅ aplicado |
+| 5 | Botão voltar removido em `/cozinha` | ✅ |
 
 **BATERIA COMPLETA DE TESTES** (12/08/2026) — 40 testes, todos ✅:
 
@@ -563,7 +592,7 @@ O roteiro completo está em `supabase/tests.sql`. Pendência: teste de anti-corr
   ```
 - **Tabelas/RPCs envolvidas**: `business_days` (constraint `business_days_day_key`, índice `business_days_one_open_idx`), RPC `open_business_day(numeric, jsonb)`, `settings.tz`.
 - **Solução preparada (migration local `0020_allow_reopen_same_day.sql`)**: remover `business_days_day_key` (UNIQUE(day)). A regra de "no máximo 1 dia aberto por vez" continua garantida pelo índice parcial único `business_days_one_open_idx` (UNIQUE(1) WHERE status='aberto'). Dia fechado nunca é apagado; reabrir a mesma data cria novo registro com novo id (histórico/pedidos do anterior intactos).
-- **STATUS: AGUARDANDO AUTORIZAÇÃO PARA APLICAR** (migration NÃO rodada no banco; NADA foi alterado em produção).
+- **STATUS: RESOLVIDO** — migration `0020` aplicada no banco real.
 
 ### 19/08/2026 — ABERTURA DO DIA: CADASTRO DE PRODUTO + REDESIGN VISUAL (LOGIN / HOME / MARCA)
 
@@ -670,45 +699,73 @@ Build OK local. **NÃO commitado/deployado ainda.** Nenhuma dependência nova. N
 
 **Testar:** pedido com itens em várias categorias; complemento; cozinha (botões rápidos); navegação com skeleton; histórico com muitos dias.
 
+### 21/08/2026 — COMPLEMENTO REABRE COZINHA + UX (LOGIN, DINHEIRO, COZINHA)
+
+**Fluxo complemento → cozinha (migrations 0026 + 0027 — APLICADAS no banco real via `supabase db push`):**
+- **`0026_complement_kitchen_flow.sql`**: coluna `order_complements.kitchen_status` (`pendente`/`em_preparo`/`pronto`); `add_items_to_order` — se pedido estava `pronto`, muda para `novo` + histórico `pronto→novo`; `update_order_status` sincroniza `kitchen_status` dos complementos nas transições.
+- **`0027_fix_stuck_complement_orders.sql`**: backfill — pedidos que receberam complemento antes da 0026 (ficaram presos em `pronto`) são reabertos na cozinha.
+- **`lib/kitchen-display.ts`**: filtra itens visíveis na cozinha — pedido `novo` com complemento pendente mostra **somente** itens do complemento (não repete pratos originais já prontos); pedido `em_preparo` + complemento mostra originais + complemento pendente.
+- **`cozinha/page.tsx` + `kitchen-board.tsx`**: carrega `order_complements`; badge **🔔 Complemento**; beep + destaque quando status muda `pronto→novo` (Realtime).
+- **`addItemsAction`**: retorna `status` do pedido; `revalidatePath` em `/pedidos` e `/cozinha`; board do John atualiza status local ao adicionar itens.
+
+**UX cozinha:**
+- Removido **BackButton** de `/cozinha` — perfil cozinha usa essa tela como home; botão voltar não tinha histórico e podia travar em skeleton.
+
+**UX login (notebook):**
+- `login/page.tsx`: layout lg+ — imagem full-bleed `/public/img/sistema-shekinah-tela-de-login.png` à esquerda; card estreito à direita; removidos textos redundantes; mantido "Acesso interno".
+
+**Entrada monetária estilo banco:**
+- `lib/money.ts` + `components/money-input.tsx` — dígitos da direita (ex.: `3500` → `35,00`); campo inicia vazio; `onFocus` seleciona tudo.
+- Aplicado em: caixa (`cashier-panel` — receber + conferência), fechamento (`closeout-panel`).
+
+**Abas de categoria:**
+- `components/category-tabs.tsx` reutilizável (scroll horizontal mobile); usado em `new-order-form.tsx` e `add-items-modal.tsx`.
+
+**Navegação com skeleton:**
+- `components/navigation-pending.tsx` — `NavigationPendingProvider`, `SkNavLink`, `useSkNavigate`; skeleton instantâneo ao navegar (home, histórico, fechamento, etc.).
+
+**Modal de impressão (limpeza visual):**
+- `print-preview-modal.tsx`: topo só com o nome do documento (ex. **Relatório de fechamento**); removidos "· pré-visualização", ícone 🖨 e rodapé "Visualização da comanda…" / "Pré-visualização na tela (modo teste)".
+- `print-receipt-button.tsx`: não exibe status genérico no modo preview (só erro ou "Enviado para a impressora").
+
+Build OK local. Migrations 0026/0027 aplicadas no Supabase remoto. **Alterações de código locais — verificar commit/deploy.**
+
 ## 15. Estado atual
 
 ```
 ESTADO ATUAL DO PROJETO:
-Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0025+,
-11+ tabelas, RLS, RPCs. AUDITORIA DE SEGURANÇA concluída. BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅.
+Banco (PostgreSQL/Supabase) validado no projeto real (jztxzmjdxzniatlgmxtk): migrations 0001–0027
+APLICADAS (incl. 0020 reabrir mesmo dia, 0026/0027 complemento→cozinha). RLS + RPCs OK.
+AUDITORIA DE SEGURANÇA concluída. BATERIA COMPLETA DE TESTES (12/08/2026): 40 testes ✅.
 Funcionalidades operacionais completas (abertura → fechamento). Impressão web (preview + comanda/complemento) OK;
 transporte físico da impressora ainda por definir.
 
-ALTERAÇÕES LOCAIS RECENTES (20/08/2026 manhã — NÃO commitadas/deployadas):
-- Otimização de performance: queries (order_items filtrado, histórico agregado), helpers cacheados, skeleton loading.
-- Novo pedido/complemento: abas de categoria, impressora SSR, menos revalidatePath.
-- Realtime otimizado (boards + home); cozinha com update otimista.
-- PWA standalone (manifest.ts, SW v2) — ver sessão 20/08 manhã.
+ALTERAÇÕES RECENTES (21/08/2026 — código local + migrations REMOTAS aplicadas):
+- Complemento em pedido PRONTO reabre cozinha (0026/0027); filtro só itens novos; beep + 🔔.
+- Cozinha sem botão voltar; addItemsAction retorna status; MoneyInput em caixa/fechamento.
+- Login notebook (imagem full-bleed); CategoryTabs; navegação com skeleton (SkNavLink).
+- Modal de impressão enxuto (relatório/comanda/complemento — sem textos técnicos).
 
-ALTERAÇÕES LOCAIS ANTERIORES (20/08/2026 — commitadas: favicon, qty abrir-dia, PWA parcial):
-- Correção input de quantidade em /abrir-dia.
-- Favicon + ícones PWA alinhados à marca (`npm run icons`).
-
-ALTERAÇÕES ANTERIORES (19/08/2026 sessão 2):
-- Design system `sk-*`, usuários, Realtime home, login notebook, hero home.
+ALTERAÇÕES ANTERIORES (20/08/2026):
+- Performance: queries otimizadas, skeleton loading, abas de categoria, Realtime otimizado, PWA standalone.
 
 ÚLTIMA ETAPA CONCLUÍDA:
-Otimização completa de desempenho e UX de carregamento (queries, skeleton, categorias, Realtime) + PWA standalone — build OK local.
+UX do modal de impressão (título limpo + rodapé sem ruído) + fluxo complemento→cozinha (0026/0027 no banco).
 
 PRÓXIMA ETAPA:
-1) Commit + deploy das alterações locais (performance + PWA).
-2) Reinstalar PWA no celular após deploy.
-3) Configurar `SUPABASE_SERVICE_ROLE_KEY` no Vercel (se ainda não feito).
+1) Commit + deploy das alterações locais (complemento/cozinha, login, MoneyInput, UX).
+2) Testar ponta a ponta: pedido pronto → adicionar picanha → cozinha vê só picanha em NOVOS → preparo → pronto.
+3) Reinstalar PWA no celular após deploy (se aplicável).
 4) Transporte físico REAL da impressora — depende do modelo escolhido.
-5) Validar fluxo completo com múltiplos atendentes.
 
 PROBLEMAS PENDENTES:
-- Alterações de **performance/PWA** locais **NÃO commitadas/deployadas**.
+- Código de 21/08/2026 pode estar **NÃO commitado/deployado** (migrations já no Supabase).
 - `/estoque` sem Realtime entre atendentes.
 - Relatório sem breakdown por atendente.
-- Bundle client `@supabase/supabase-js` ainda grande (otimização futura).
+- Bundle client `@supabase/supabase-js` ainda grande.
 - Índices SQL recomendados (`stock_movements.business_day_id`) não aplicados.
 - Modelo/método da impressora INDEFINIDO.
+- Teste formal do fluxo complemento→cozinha (0026) ainda não documentado na bateria de testes.
 ```
 
 ---
@@ -721,7 +778,8 @@ Auditoria completa realizada (revisão de código + banco + testes de intrusão 
 
 | Regra | Como foi garantida | Teste |
 |---|---|---|
-| Não vender acima do estoque / estoque negativo | `FOR UPDATE` + validação `initial_qty - sold_qty >= qty` em `create_order`/`add_items_to_order`; checks `>= 0` | ✅ `ESTOQUE_INSUFICIENTE` |
+| Não vender acima do estoque / estoque negativo | `FOR UPDATE` + validação em `create_order`/`add_items_to_order`; checks `>= 0` | ✅ `ESTOQUE_INSUFICIENTE` |
+| Complemento não refaz prato original na cozinha | `kitchen_status` + filtro `kitchen-display`; `pronto+complemento→novo` (0026) | ✅ implementado 21/08/2026 |
 | Pedido sem dia aberto | `create_order` exige `status='aberto'` (`DIA_NAO_ABERTO`) | ✅ |
 | Pedido após dia encerrado | `create_order`/`add_items_to_order`/`adjust_stock` verificam dia aberto | ✅ `DIA_NAO_ABERTO` |
 | Cozinha acessar caixa/pagamentos | RLS `payments`/`daily_stock`/`order_status_history` só `is_john()`; RPCs financeiras exigem john | ✅ `PERMISSAO_NEGADA` |

@@ -20,9 +20,6 @@ export default function PrintPreviewModal({
         ? "Comanda complementar"
         : "Relatório de fechamento";
 
-  const statusOk =
-    statusMessage?.startsWith("Enviado") || statusMessage?.startsWith("Pré-visualização");
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm"
@@ -33,7 +30,7 @@ export default function PrintPreviewModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
-          <p className="text-sm font-bold text-neutral-800">🖨 {label} · pré-visualização</p>
+          <p className="text-sm font-bold text-neutral-800">{label}</p>
           <button type="button" onClick={onClose} className="sk-btn-ghost sk-btn-sm">
             Fechar
           </button>
@@ -45,20 +42,17 @@ export default function PrintPreviewModal({
           </pre>
         </div>
 
-        <div className="border-t border-neutral-200 px-4 py-3">
-          {statusMessage && (
+        {statusMessage && !statusMessage.startsWith("Pré-visualização") && (
+          <div className="border-t border-neutral-200 px-4 py-3">
             <p
-              className={`mb-2 text-center text-xs font-semibold ${
-                statusOk ? "text-success-600" : "text-danger-600"
+              className={`text-center text-xs font-semibold ${
+                statusMessage.startsWith("Enviado") ? "text-success-600" : "text-danger-600"
               }`}
             >
               {statusMessage}
             </p>
-          )}
-          <p className="text-center text-[11px] sk-text-muted">
-            Visualização da comanda em formato de impressão.
-          </p>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

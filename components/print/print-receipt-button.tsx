@@ -26,13 +26,9 @@ export default function PrintReceiptButton({
       setPreview(result.preview);
       setOpen(true);
       if (result.ok) {
-        setStatus(
-          result.sentToPrinter
-            ? "Enviado para a impressora."
-            : "Pré-visualização na tela (modo teste)."
-        );
+        setStatus(result.sentToPrinter ? "Enviado para a impressora." : null);
       } else {
-        setStatus(result.error ?? "Falha ao imprimir. Confira a pré-visualização.");
+        setStatus(result.error ?? "Falha ao imprimir.");
       }
     } finally {
       setPending(false);
