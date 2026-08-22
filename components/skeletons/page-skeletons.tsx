@@ -51,9 +51,9 @@ export function ProductListSkeleton({ rows = 5 }: { rows?: number }) {
 
 export function CategoryTabsSkeleton() {
   return (
-    <div className="flex gap-2 overflow-hidden pb-1">
+    <div className="sk-category-tabs pointer-events-none" aria-hidden>
       {Array.from({ length: 4 }).map((_, i) => (
-        <Bone key={i} className="h-9 w-20 shrink-0 rounded-full" />
+        <div key={i} className="sk-skeleton h-10 w-[5.5rem] shrink-0 rounded-full" />
       ))}
     </div>
   );

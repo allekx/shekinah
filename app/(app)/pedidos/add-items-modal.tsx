@@ -10,6 +10,7 @@ import {
   parseQtyInput,
   type CatalogProduct,
 } from "@/lib/catalog";
+import CategoryTabs from "@/components/category-tabs";
 
 interface ExistingItem {
   product_name: string;
@@ -174,22 +175,12 @@ export default function AddItemsModal({
 
         {/* Seleção de novos produtos */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {sortedCategories.length > 1 && (
-            <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
-              {sortedCategories.map(([category]) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setActiveCategory(category)}
-                  className={`sk-category-tab ${
-                    activeCategory === category ? "sk-category-tab--active" : ""
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-          )}
+          <CategoryTabs
+            categories={sortedCategories.map(([category]) => category)}
+            active={activeCategory}
+            onChange={setActiveCategory}
+            className="mb-3 sk-category-tabs--in-modal"
+          />
           <section>
             <h3 className="mb-2 sk-section-title">{activeCategory}</h3>
             <ul className="space-y-2">

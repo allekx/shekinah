@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useRef, useState } from "react";
 import PageShell from "@/components/page-shell";
+import CategoryTabs from "@/components/category-tabs";
 import { useSkNavigate } from "@/components/navigation-pending";
 import { createOrderAction, type CreateOrderResult } from "@/lib/auth/orders";
 import { printOrderReceipt, type PrintOrderData } from "@/lib/printing/print";
@@ -133,22 +134,11 @@ export default function NewOrderForm({
           />
         </section>
 
-        {sortedCategories.length > 1 && (
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
-            {sortedCategories.map(([category]) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setActiveCategory(category)}
-                className={`sk-category-tab ${
-                  activeCategory === category ? "sk-category-tab--active" : ""
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        )}
+        <CategoryTabs
+          categories={sortedCategories.map(([category]) => category)}
+          active={activeCategory}
+          onChange={setActiveCategory}
+        />
 
         <section className="sk-card p-4">
           <h2 className="sk-section-title mb-3">{activeCategory}</h2>
@@ -159,7 +149,7 @@ export default function NewOrderForm({
               return (
                 <li
                   key={p.id}
-                  className={`sk-list-row px-3 py-2 ${soldOut ? "opacity-60" : ""}`}
+                  className={`sk-list-row px-3 py-3 sm:py-2 ${soldOut ? "opacity-60" : ""}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
